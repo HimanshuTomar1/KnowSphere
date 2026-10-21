@@ -16,6 +16,11 @@ import StorageStep         from './components/steps/StorageStep';
 import RecommendationsStep from './components/steps/RecommendationsStep';
 import DownloadStep        from './components/steps/DownloadStep';
 import CompleteStep        from './components/steps/CompleteStep';
+import {
+  persistDownloads,
+  persistTelemetry,
+  loadPersistedDownloads
+} from './utils/offlineStorage';
 
 const STEPS = [
   { id: 'welcome',         label: 'Welcome',      sub: 'Introduction'          },
@@ -142,10 +147,11 @@ export default function App() {
     }
   });
 
-  const handleAuthSuccess = authUser => {
+  const handleAuthSuccess = (authUser, token) => {
     setUser(authUser);
     try {
       localStorage.setItem('knowsphere_user', JSON.stringify(authUser));
+      if (token) localStorage.setItem('knowsphere_token', token);
     } catch (e) {
       console.warn('Storage failed', e);
     }
@@ -155,11 +161,36 @@ export default function App() {
     setUser(null);
     try {
       localStorage.removeItem('knowsphere_user');
+      localStorage.removeItem('knowsphere_token');
       localStorage.removeItem('kiwix_user');
     } catch (e) {
       console.warn('Storage clear failed', e);
     }
   };
+
+  // Restore persisted downloads from client storage on mount
+  useEffect(() => {
+    loadPersistedDownloads().then(saved => {
+      if (saved && Array.isArray(saved) && saved.length > 0) {
+        setState(prev => ({
+          ...prev,
+          downloads: saved
+        }));
+      }
+    }).catch(() => {});
+  }, []);
+
+  // Automatically persist downloads when changed
+  useEffect(() => {
+    if (state.downloads && state.downloads.length > 0) {
+      persistDownloads(state.downloads);
+    }
+  }, [state.downloads]);
+
+  // Automatically persist live telemetry data
+  useEffect(() => {
+    persistTelemetry(telemetry);
+  }, [telemetry]);
 
   // Generic setter — supports both value and updater-function
   const set = key => val =>

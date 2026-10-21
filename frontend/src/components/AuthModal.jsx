@@ -83,7 +83,7 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess, onLogo
         setSuccessMsg(`Account needs verification. OTP: ${res.data.otp}`);
         setResendCooldown(45);
       } else if (res.data.success) {
-        onAuthSuccess(res.data.user);
+        onAuthSuccess(res.data.user, res.data.token);
         onClose();
       }
     } catch (err) {
@@ -154,7 +154,7 @@ export default function AuthModal({ isOpen, onClose, user, onAuthSuccess, onLogo
       });
 
       if (res.data.success) {
-        onAuthSuccess(res.data.user);
+        onAuthSuccess(res.data.user, res.data.token);
         onClose();
       }
     } catch (err) {

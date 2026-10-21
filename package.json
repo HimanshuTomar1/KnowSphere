@@ -6,6 +6,9 @@
     "install:all": "npm install --prefix backend && npm install --prefix frontend",
     "start:backend": "npm start --prefix backend",
     "start:frontend": "npm start --prefix frontend",
+    "test:backend": "npm test --prefix backend",
+    "test:frontend": "npm test --prefix frontend",
+    "test": "npm run test:backend && npm run test:frontend",
     "dev": "start cmd /k \"npm run start:backend\" && start cmd /k \"npm run start:frontend\""
   }
 }

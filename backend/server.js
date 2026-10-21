@@ -4,37 +4,22 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 
+const db = require('./db');
+const {
+  hashPassword,
+  verifyPassword,
+  generateToken,
+  requireAuth,
+  sanitizeUser
+} = require('./security');
+
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
 
-// ─── In-memory stores ────────────────────────────────────────────────────────
-const sessions = {};   // sessionId -> { interests, languages, storageGB, connectionSpeedMbps }
-const downloads = {};  // downloadId -> download state
-const users = {};      // email -> { name, email, password, phone, verified, createdAt }
-const otps = {};       // email -> { code, expiresAt, attempts }
-
-// Demo seed accounts
-users['explorer@knowsphere.org'] = {
-  name: 'KnowSphere Explorer',
-  email: 'explorer@knowsphere.org',
-  password: 'password123',
-  phone: '+1 555-0199',
-  verified: true,
-  createdAt: Date.now()
-};
-users['explorer@kiwix.org'] = {
-  name: 'KnowSphere Explorer',
-  email: 'explorer@kiwix.org',
-  password: 'password123',
-  phone: '+1 555-0199',
-  verified: true,
-  createdAt: Date.now()
-};
-
-// ─── Load catalogue ──────────────────────────────────────────────────────────
+// Load catalogue
 const catalogue = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'data', 'catalogue.json'), 'utf8')
 );
@@ -101,7 +86,7 @@ function scoreZim(zim, interests = [], languages = ['en'], availableBytes = 50e9
     score -= 25;
   }
 
-  // Connection-speed awareness (Stretch Goal):
+  // Connection-speed awareness:
   // On 2G/3G (<= 2 Mbps), strongly boost compact/mini packs (< 1.5 GB) and penalize multi-GB archives
   const isLightweight = zim.sizeBytes <= 1.5e9 || (zim.tags && zim.tags.includes('lightweight')) || zim.id.includes('-mini') || zim.id.includes('-lite') || zim.id.includes('-top');
   if (connectionSpeedMbps <= 2) {
@@ -122,11 +107,11 @@ function scoreZim(zim, interests = [], languages = ['en'], availableBytes = 50e9
   return Math.max(score, 0);
 }
 
-// ─── Authentication Routes ──────────────────────────────────────────────────
-
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
+
+// ─── Authentication Routes (Hardened & Persistent) ──────────────────────────
 
 app.post('/api/auth/register', (req, res) => {
   const { name, email, password, phone } = req.body;
@@ -137,27 +122,27 @@ app.post('/api/auth/register', (req, res) => {
 
   const normalizedEmail = email.trim().toLowerCase();
 
-  if (users[normalizedEmail]) {
+  if (db.getUser(normalizedEmail)) {
     return res.status(409).json({ error: 'An account with this email already exists.' });
   }
 
   const otpCode = generateOTP();
   const expiresAt = Date.now() + 10 * 60 * 1000;
 
-  users[normalizedEmail] = {
+  db.createUser({
     name: name.trim(),
     email: normalizedEmail,
-    password: password,
+    passwordHash: hashPassword(password),
     phone: phone ? phone.trim() : '',
     verified: false,
     createdAt: Date.now()
-  };
+  });
 
-  otps[normalizedEmail] = {
+  db.saveOtp(normalizedEmail, {
     code: otpCode,
     expiresAt,
     attempts: 0
-  };
+  });
 
   console.log(`[AUTH] 📧 Registration OTP for ${normalizedEmail}: ${otpCode}`);
 
@@ -181,11 +166,11 @@ app.post('/api/auth/send-otp', (req, res) => {
   const otpCode = generateOTP();
   const expiresAt = Date.now() + 10 * 60 * 1000;
 
-  otps[normalizedEmail] = {
+  db.saveOtp(normalizedEmail, {
     code: otpCode,
     expiresAt,
     attempts: 0
-  };
+  });
 
   console.log(`[AUTH] 🔑 Resent OTP for ${normalizedEmail}: ${otpCode}`);
 
@@ -205,44 +190,48 @@ app.post('/api/auth/verify-otp', (req, res) => {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const record = otps[normalizedEmail];
+  const record = db.getOtp(normalizedEmail);
 
   if (!record) {
     return res.status(400).json({ error: 'No OTP requested for this email. Please request a new one.' });
   }
 
   if (Date.now() > record.expiresAt) {
-    delete otps[normalizedEmail];
+    db.deleteOtp(normalizedEmail);
     return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
   }
 
   if (record.code !== otp.toString().trim()) {
     record.attempts = (record.attempts || 0) + 1;
     if (record.attempts >= 5) {
-      delete otps[normalizedEmail];
+      db.deleteOtp(normalizedEmail);
       return res.status(400).json({ error: 'Too many incorrect attempts. Please request a new OTP.' });
     }
+    db.saveOtp(normalizedEmail, record);
     return res.status(400).json({ error: 'Invalid verification code. Please check and try again.' });
   }
 
-  delete otps[normalizedEmail];
+  db.deleteOtp(normalizedEmail);
 
-  if (users[normalizedEmail]) {
-    users[normalizedEmail].verified = true;
+  const existingUser = db.getUser(normalizedEmail);
+  if (existingUser) {
+    db.updateUser(normalizedEmail, { verified: true });
   }
 
-  const userProfile = users[normalizedEmail] || { email: normalizedEmail, name: 'KnowSphere User', verified: true };
+  const updatedUser = db.getUser(normalizedEmail) || { email: normalizedEmail, name: 'KnowSphere User', verified: true };
+  const cleanUser = sanitizeUser(updatedUser);
+
+  const token = generateToken({
+    email: cleanUser.email,
+    name: cleanUser.name,
+    verified: true
+  });
 
   res.json({
     success: true,
     message: 'OTP verified successfully! Welcome to KnowSphere.',
-    user: {
-      name: userProfile.name,
-      email: userProfile.email,
-      phone: userProfile.phone || '',
-      verified: true
-    },
-    token: `knowsphere_token_${uuidv4()}`
+    user: cleanUser,
+    token
   });
 });
 
@@ -254,19 +243,19 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const user = users[normalizedEmail];
+  const user = db.getUser(normalizedEmail);
 
-  if (!user || user.password !== password) {
+  if (!user || !verifyPassword(password, user.passwordHash || user.password)) {
     return res.status(401).json({ error: 'Invalid email or password.' });
   }
 
   if (!user.verified) {
     const otpCode = generateOTP();
-    otps[normalizedEmail] = {
+    db.saveOtp(normalizedEmail, {
       code: otpCode,
       expiresAt: Date.now() + 10 * 60 * 1000,
       attempts: 0
-    };
+    });
     return res.json({
       success: false,
       requiresOtp: true,
@@ -276,33 +265,43 @@ app.post('/api/auth/login', (req, res) => {
     });
   }
 
+  const cleanUser = sanitizeUser(user);
+  const token = generateToken({
+    email: cleanUser.email,
+    name: cleanUser.name,
+    verified: cleanUser.verified
+  });
+
   res.json({
     success: true,
     message: 'Login successful!',
-    user: {
-      name: user.name,
-      email: user.email,
-      phone: user.phone || '',
-      verified: user.verified
-    },
-    token: `knowsphere_token_${uuidv4()}`
+    user: cleanUser,
+    token
   });
 });
 
 app.get('/api/auth/me', (req, res) => {
+  // Support both Bearer JWT token header and fallback query param
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const decoded = require('./security').verifyToken(token);
+    if (decoded && decoded.email) {
+      const user = db.getUser(decoded.email);
+      if (user) {
+        return res.json(sanitizeUser(user));
+      }
+    }
+  }
+
   const { email } = req.query;
-  if (!email) return res.status(400).json({ error: 'Email is required' });
-  const user = users[email.trim().toLowerCase()];
+  if (!email) return res.status(400).json({ error: 'Email or Authorization token is required' });
+  const user = db.getUser(email.trim().toLowerCase());
   if (!user) return res.status(404).json({ error: 'User not found' });
-  res.json({
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    verified: user.verified
-  });
+  res.json(sanitizeUser(user));
 });
 
-// ─── Routes ──────────────────────────────────────────────────────────────────
+// ─── Catalogue & Categories ──────────────────────────────────────────────────
 
 app.get('/api/catalogue', (req, res) => {
   const { category, language } = req.query;
@@ -340,10 +339,12 @@ app.get('/api/languages', (req, res) => {
   res.json(languages);
 });
 
+// ─── Session Management (Persistent) ─────────────────────────────────────────
+
 app.post('/api/session', (req, res) => {
   const { sessionId, interests = [], languages = [], storageGB, connectionSpeedMbps = 10 } = req.body;
   const id = sessionId || uuidv4();
-  sessions[id] = { interests, languages, storageGB: storageGB || null, connectionSpeedMbps };
+  db.saveSession(id, { interests, languages, storageGB: storageGB || null, connectionSpeedMbps });
   res.json({ sessionId: id });
 });
 
@@ -368,10 +369,11 @@ app.get('/api/real-catalogue', async (req, res) => {
   }
 });
 
-// GET /api/recommendations — respects both session and live query overrides
+// ─── Recommendations Engine ──────────────────────────────────────────────────
+
 app.get('/api/recommendations', async (req, res) => {
   const { sessionId, interests: qInterests, languages: qLanguages, storageGB: qStorageGB, speedMbps: qSpeed } = req.query;
-  const existing = sessions[sessionId] || {};
+  const existing = (sessionId && db.getSession(sessionId)) || {};
 
   const parsedInterests = qInterests ? qInterests.split(',').filter(Boolean) : existing.interests;
   const parsedLanguages = qLanguages ? qLanguages.split(',').filter(Boolean) : existing.languages;
@@ -445,6 +447,8 @@ app.get('/api/recommendations', async (req, res) => {
   });
 });
 
+// ─── Download Engine (Resumable & Persistent) ────────────────────────────────
+
 app.post('/api/download/start', async (req, res) => {
   const { zimId, sessionId } = req.body;
 
@@ -468,7 +472,7 @@ app.post('/api/download/start', async (req, res) => {
   }
 
   const downloadId = uuidv4();
-  downloads[downloadId] = {
+  const dlRecord = {
     id: downloadId,
     downloadId,
     zimId: zim.id,
@@ -483,13 +487,14 @@ app.post('/api/download/start', async (req, res) => {
     browseUrl: zim.browseUrl || null,
   };
 
+  db.saveDownload(downloadId, dlRecord);
   tickDownload(downloadId);
 
   res.json({ downloadId, status: 'downloading', zim });
 });
 
 function tickDownload(downloadId) {
-  const dl = downloads[downloadId];
+  const dl = db.getDownload(downloadId);
   if (!dl || dl.status !== 'downloading') return;
 
   const chunkPercent = Math.random() * 0.08 + 0.16;
@@ -515,9 +520,11 @@ function tickDownload(downloadId) {
     } catch (e) {
       console.warn('Could not write local ZIM file:', e.message);
     }
+    db.saveDownload(downloadId, dl);
     return;
   }
 
+  db.saveDownload(downloadId, dl);
   setTimeout(() => tickDownload(downloadId), 750);
 }
 
@@ -549,6 +556,7 @@ app.get('/api/storage/metrics', (req, res) => {
   const { storageGB = 20 } = req.query;
   const totalAllocatedBytes = parseFloat(storageGB) * 1e9;
 
+  const downloads = db.getDownloads();
   const usedBytes = Object.values(downloads)
     .filter(d => d.status === 'completed' || d.status === 'downloading')
     .reduce((sum, d) => sum + (d.downloadedBytes || d.sizeBytes), 0);
@@ -569,7 +577,7 @@ app.get('/api/storage/metrics', (req, res) => {
 });
 
 app.get('/api/download/:id', (req, res) => {
-  const dl = downloads[req.params.id];
+  const dl = db.getDownload(req.params.id);
   if (!dl) return res.status(404).json({ error: 'Download not found' });
 
   const progress = dl.sizeBytes > 0 ? (dl.downloadedBytes / dl.sizeBytes) * 100 : 0;
@@ -582,27 +590,29 @@ app.get('/api/download/:id', (req, res) => {
 });
 
 app.post('/api/download/:id/pause', (req, res) => {
-  const dl = downloads[req.params.id];
+  const dl = db.getDownload(req.params.id);
   if (!dl) return res.status(404).json({ error: 'Not found' });
   if (dl.status === 'downloading') {
     dl.status = 'paused';
     dl.pausedAt = Date.now();
+    db.saveDownload(dl.id, dl);
   }
   res.json({ status: dl.status });
 });
 
 app.post('/api/download/:id/resume', (req, res) => {
-  const dl = downloads[req.params.id];
+  const dl = db.getDownload(req.params.id);
   if (!dl) return res.status(404).json({ error: 'Not found' });
   if (dl.status === 'paused') {
     dl.status = 'downloading';
     dl.pausedAt = null;
+    db.saveDownload(dl.id, dl);
     tickDownload(dl.id);
   }
   res.json({ status: dl.status });
 });
 
-const recoveryAuditHistory = [];
+// ─── Network Drop & Zero-Loss Recovery Simulation ────────────────────────────
 
 app.post('/api/recovery/start-live-test', async (req, res) => {
   const { zimId = 'wikimed-en' } = req.body;
@@ -615,7 +625,7 @@ app.post('/api/recovery/start-live-test', async (req, res) => {
   };
 
   const id = uuidv4();
-  downloads[id] = {
+  const dl = {
     id,
     downloadId: id,
     zimId: zim.id,
@@ -629,6 +639,7 @@ app.post('/api/recovery/start-live-test', async (req, res) => {
     sourceUrl: zim.downloadUrl,
   };
 
+  db.saveDownload(id, dl);
   tickDownload(id);
 
   res.json({
@@ -642,11 +653,14 @@ app.post('/api/recovery/start-live-test', async (req, res) => {
 
 app.post('/api/recovery/simulate-drop', (req, res) => {
   const { downloadId } = req.body;
-  let dl = downloads[downloadId] || Object.values(downloads).find(d => d.status === 'downloading') || Object.values(downloads)[0];
+  const downloads = db.getDownloads();
+  let dl = (downloadId && db.getDownload(downloadId)) ||
+           Object.values(downloads).find(d => d.status === 'downloading') ||
+           Object.values(downloads)[0];
 
   if (!dl) {
     const id = uuidv4();
-    downloads[id] = {
+    dl = {
       id,
       downloadId: id,
       zimId: 'wikimed-en',
@@ -657,7 +671,7 @@ app.post('/api/recovery/simulate-drop', (req, res) => {
       error: 'SIMULATED_NETWORK_DROP',
       sourceUrl: 'https://download.kiwix.org/zim/other/wikimed-en.zim',
     };
-    dl = downloads[id];
+    db.saveDownload(id, dl);
   }
 
   dl.status = 'interrupted';
@@ -685,7 +699,9 @@ app.post('/api/recovery/simulate-drop', (req, res) => {
     checksum: dl.chunkChecksum,
     verdict: '100% Chunk Preserved On Disk',
   };
-  recoveryAuditHistory.unshift(auditEntry);
+
+  db.addAuditEntry(auditEntry);
+  db.saveDownload(dl.id, dl);
 
   res.json({
     success: true,
@@ -703,7 +719,8 @@ app.post('/api/recovery/simulate-drop', (req, res) => {
 
 app.post('/api/recovery/resume-stream', (req, res) => {
   const { downloadId } = req.body;
-  let dl = downloads[downloadId] || Object.values(downloads)[0];
+  const downloads = db.getDownloads();
+  let dl = (downloadId && db.getDownload(downloadId)) || Object.values(downloads)[0];
   if (!dl) {
     return res.status(404).json({ error: 'Download not found' });
   }
@@ -713,6 +730,7 @@ app.post('/api/recovery/resume-stream', (req, res) => {
   dl.error = null;
   dl.resumedAt = Date.now();
 
+  db.saveDownload(dl.id, dl);
   tickDownload(dl.id);
 
   const auditEntry = {
@@ -727,7 +745,9 @@ app.post('/api/recovery/resume-stream', (req, res) => {
     protocol: 'HTTP Range 206 Partial Content',
     verdict: 'Resumed without data loss',
   };
-  recoveryAuditHistory.unshift(auditEntry);
+
+  db.addAuditEntry(auditEntry);
+  db.saveDownload(dl.id, dl);
 
   res.json({
     success: true,
@@ -742,23 +762,25 @@ app.post('/api/recovery/resume-stream', (req, res) => {
 });
 
 app.get('/api/recovery/audit', (req, res) => {
+  const history = db.getAuditHistory();
   res.json({
-    totalEvents: recoveryAuditHistory.length,
-    events: recoveryAuditHistory,
+    totalEvents: history.length,
+    events: history,
     systemIntegrity: '100% Resumable Verified',
     architecture: 'Atomic block storage & HTTP Range chunking',
   });
 });
 
 app.post('/api/download/:id/cancel', (req, res) => {
-  const dl = downloads[req.params.id];
+  const dl = db.getDownload(req.params.id);
   if (!dl) return res.status(404).json({ error: 'Not found' });
   dl.status = 'cancelled';
+  db.saveDownload(dl.id, dl);
   res.json({ status: dl.status });
 });
 
 app.get('/api/download/:id/file', (req, res) => {
-  const dl = downloads[req.params.id];
+  const dl = db.getDownload(req.params.id);
   if (!dl) return res.status(404).json({ error: 'Download not found' });
 
   const safeFilename = `${(dl.title || dl.zimId).replace(/[^a-zA-Z0-9_-]/g, '_')}.zim`;
@@ -786,6 +808,7 @@ app.get('/api/download/:id/file', (req, res) => {
 });
 
 app.get('/api/downloads', (req, res) => {
+  const downloads = db.getDownloads();
   const list = Object.values(downloads).map(dl => {
     const progress = dl.sizeBytes > 0 ? (dl.downloadedBytes / dl.sizeBytes) * 100 : 0;
     return {
@@ -799,6 +822,10 @@ app.get('/api/downloads', (req, res) => {
   res.json(list);
 });
 
-app.listen(PORT, () => {
-  console.log(`✅  KnowSphere Offline API running at http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`✅  KnowSphere Offline API running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
