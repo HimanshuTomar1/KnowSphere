@@ -1,0 +1,282 @@
+[
+  {
+    "id": "wikipedia-en-all",
+    "title": "Wikipedia (English) — All",
+    "description": "The complete English Wikipedia with all articles, images, and media.",
+    "category": "encyclopedia",
+    "language": "en",
+    "sizeBytes": 97000000000,
+    "tags": ["reference", "education", "articles"],
+    "icon": "📖"
+  },
+  {
+    "id": "wikipedia-en-mini",
+    "title": "Wikipedia (English) — Mini",
+    "description": "English Wikipedia with the top 50,000 articles, no images.",
+    "category": "encyclopedia",
+    "language": "en",
+    "sizeBytes": 980000000,
+    "tags": ["reference", "education", "lightweight"],
+    "icon": "📖"
+  },
+  {
+    "id": "wikipedia-hi-all",
+    "title": "Wikipedia (Hindi) — All",
+    "description": "Complete Hindi Wikipedia with articles and images.",
+    "category": "encyclopedia",
+    "language": "hi",
+    "sizeBytes": 2800000000,
+    "tags": ["reference", "education"],
+    "icon": "📖"
+  },
+  {
+    "id": "wikipedia-es-all",
+    "title": "Wikipedia (Spanish) — All",
+    "description": "Complete Spanish Wikipedia with articles and images.",
+    "category": "encyclopedia",
+    "language": "es",
+    "sizeBytes": 12000000000,
+    "tags": ["reference", "education"],
+    "icon": "📖"
+  },
+  {
+    "id": "wikipedia-fr-all",
+    "title": "Wikipedia (French) — All",
+    "description": "Complete French Wikipedia with articles and images.",
+    "category": "encyclopedia",
+    "language": "fr",
+    "sizeBytes": 10500000000,
+    "tags": ["reference", "education"],
+    "icon": "📖"
+  },
+  {
+    "id": "wikipedia-ar-all",
+    "title": "Wikipedia (Arabic) — All",
+    "description": "Complete Arabic Wikipedia with articles and images.",
+    "category": "encyclopedia",
+    "language": "ar",
+    "sizeBytes": 3200000000,
+    "tags": ["reference", "education"],
+    "icon": "📖"
+  },
+  {
+    "id": "wikipedia-de-all",
+    "title": "Wikipedia (German) — All",
+    "description": "Complete German Wikipedia with articles and images.",
+    "category": "encyclopedia",
+    "language": "de",
+    "sizeBytes": 38000000000,
+    "tags": ["reference", "education"],
+    "icon": "📖"
+  },
+  {
+    "id": "wikipedia-de-mini",
+    "title": "Wikipedia (German) — Mini",
+    "description": "German Wikipedia top articles without images.",
+    "category": "encyclopedia",
+    "language": "de",
+    "sizeBytes": 1100000000,
+    "tags": ["reference", "lightweight"],
+    "icon": "📖"
+  },
+  {
+    "id": "wikipedia-zh-all",
+    "title": "Wikipedia (Chinese) — All",
+    "description": "Complete Chinese Wikipedia with articles and media.",
+    "category": "encyclopedia",
+    "language": "zh",
+    "sizeBytes": 24000000000,
+    "tags": ["reference", "education"],
+    "icon": "📖"
+  },
+  {
+    "id": "wikipedia-pt-all",
+    "title": "Wikipedia (Portuguese) — All",
+    "description": "Complete Portuguese Wikipedia with articles and images.",
+    "category": "encyclopedia",
+    "language": "pt",
+    "sizeBytes": 14000000000,
+    "tags": ["reference", "education"],
+    "icon": "📖"
+  },
+  {
+    "id": "khanacademy-en",
+    "title": "Khan Academy (English)",
+    "description": "Thousands of math, science, and humanities lessons for all levels.",
+    "category": "education",
+    "language": "en",
+    "sizeBytes": 15000000000,
+    "tags": ["education", "math", "science", "videos"],
+    "icon": "🎓"
+  },
+  {
+    "id": "khanacademy-es",
+    "title": "Khan Academy (Spanish)",
+    "description": "Miles de lecciones de matemáticas, ciencias y humanidades.",
+    "category": "education",
+    "language": "es",
+    "sizeBytes": 8500000000,
+    "tags": ["education", "math", "science"],
+    "icon": "🎓"
+  },
+  {
+    "id": "gutenberg-en",
+    "title": "Project Gutenberg (English)",
+    "description": "Over 60,000 free eBooks — classic literature and more.",
+    "category": "literature",
+    "language": "en",
+    "sizeBytes": 65000000000,
+    "tags": ["books", "literature", "classics"],
+    "icon": "📚"
+  },
+  {
+    "id": "gutenberg-en-top",
+    "title": "Project Gutenberg — Top 1,000",
+    "description": "The 1,000 most-downloaded classic eBooks in English.",
+    "category": "literature",
+    "language": "en",
+    "sizeBytes": 1200000000,
+    "tags": ["books", "literature", "lightweight"],
+    "icon": "📚"
+  },
+  {
+    "id": "stackoverflow-en",
+    "title": "Stack Overflow",
+    "description": "Millions of programming Q&A, offline. The must-have dev resource.",
+    "category": "technology",
+    "language": "en",
+    "sizeBytes": 33000000000,
+    "tags": ["programming", "coding", "reference"],
+    "icon": "💻"
+  },
+  {
+    "id": "devdocs-en",
+    "title": "DevDocs Full",
+    "description": "API documentation for 100+ programming languages and frameworks.",
+    "category": "technology",
+    "language": "en",
+    "sizeBytes": 2100000000,
+    "tags": ["programming", "docs", "reference"],
+    "icon": "💻"
+  },
+  {
+    "id": "devdocs-lite",
+    "title": "DevDocs Web Essentials",
+    "description": "Fast offline documentation for JS, HTML, CSS, React, and Python.",
+    "category": "technology",
+    "language": "en",
+    "sizeBytes": 420000000,
+    "tags": ["programming", "docs", "lightweight"],
+    "icon": "💻"
+  },
+  {
+    "id": "ted-en",
+    "title": "TED Talks",
+    "description": "Hundreds of curated TED talks across science, technology, and culture.",
+    "category": "education",
+    "language": "en",
+    "sizeBytes": 7800000000,
+    "tags": ["talks", "inspiration", "science"],
+    "icon": "🎤"
+  },
+  {
+    "id": "wikimed-en",
+    "title": "WikiMed Medical Encyclopedia",
+    "description": "Medical information from Wikipedia — diseases, anatomy, treatments.",
+    "category": "health",
+    "language": "en",
+    "sizeBytes": 3800000000,
+    "tags": ["health", "medicine", "reference"],
+    "icon": "🏥"
+  },
+  {
+    "id": "wikimed-hi",
+    "title": "WikiMed Medical Encyclopedia (Hindi)",
+    "description": "Hindi medical information — diseases, anatomy, treatments.",
+    "category": "health",
+    "language": "hi",
+    "sizeBytes": 1200000000,
+    "tags": ["health", "medicine", "reference"],
+    "icon": "🏥"
+  },
+  {
+    "id": "wikimed-es",
+    "title": "WikiMed Enciclopedia Médica (Spanish)",
+    "description": "Información médica completa offline en español.",
+    "category": "health",
+    "language": "es",
+    "sizeBytes": 2200000000,
+    "tags": ["health", "medicine", "reference"],
+    "icon": "🏥"
+  },
+  {
+    "id": "wikimed-fr",
+    "title": "WikiMed Encyclopédie Médicale (French)",
+    "description": "Information médicale hors-ligne complète en français.",
+    "category": "health",
+    "language": "fr",
+    "sizeBytes": 2600000000,
+    "tags": ["health", "medicine", "reference"],
+    "icon": "🏥"
+  },
+  {
+    "id": "vikidia-en",
+    "title": "Vikidia (English)",
+    "description": "An encyclopaedia for children and young readers.",
+    "category": "kids",
+    "language": "en",
+    "sizeBytes": 480000000,
+    "tags": ["kids", "education", "simple"],
+    "icon": "🧒"
+  },
+  {
+    "id": "vikidia-fr",
+    "title": "Vikidia (French)",
+    "description": "Une encyclopédie pour les enfants et jeunes lecteurs.",
+    "category": "kids",
+    "language": "fr",
+    "sizeBytes": 620000000,
+    "tags": ["kids", "education", "simple"],
+    "icon": "🧒"
+  },
+  {
+    "id": "vikidia-es",
+    "title": "Vikidia (Spanish)",
+    "description": "Una enciclopedia para niños y jóvenes lectores.",
+    "category": "kids",
+    "language": "es",
+    "sizeBytes": 540000000,
+    "tags": ["kids", "education", "simple"],
+    "icon": "🧒"
+  },
+  {
+    "id": "openstreetmap-cities",
+    "title": "OpenStreetMap — World Cities",
+    "description": "Offline maps for major cities worldwide.",
+    "category": "maps",
+    "language": "en",
+    "sizeBytes": 4200000000,
+    "tags": ["maps", "travel", "navigation"],
+    "icon": "🗺️"
+  },
+  {
+    "id": "wikitravel-en",
+    "title": "Wikitravel (English)",
+    "description": "Free worldwide travel guide with destinations, tips, and guides.",
+    "category": "travel",
+    "language": "en",
+    "sizeBytes": 2400000000,
+    "tags": ["travel", "tourism", "guide"],
+    "icon": "✈️"
+  },
+  {
+    "id": "phet-en",
+    "title": "PhET Interactive Simulations",
+    "description": "Fun, free, interactive science and math simulations from U. of Colorado.",
+    "category": "education",
+    "language": "en",
+    "sizeBytes": 860000000,
+    "tags": ["science", "math", "simulation", "interactive"],
+    "icon": "🔬"
+  }
+]
