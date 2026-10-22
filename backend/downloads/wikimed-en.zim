@@ -1,7 +1,23 @@
 {
   "kiwixPackage": "WikiMed Medical Encyclopedia",
   "zimId": "wikimed-en",
+  "language": "en",
   "sizeBytes": 3800000000,
-  "downloadedAt": "2026-10-21T18:44:16.458Z",
-  "verifiedOffline": true
+  "sourceUrl": "https://download.kiwix.org/zim/other/wikimed-en.zim",
+  "downloadedAt": "2026-10-22T05:36:49.909Z",
+  "verifiedOffline": true,
+  "articles": [
+    {
+      "title": "Cardiopulmonary Resuscitation (CPR) Protocol",
+      "category": "Emergency Medicine",
+      "snippet": "Hands-only and standard rescue breathing resuscitation procedures.",
+      "content": "CPR (Cardiopulmonary Resuscitation)\n      \n        Check scene safety and responsiveness. Call for emergency medical assistance.\n        Place hands on center of chest (lower half of sternum).\n        Compress firmly at a rate of 100–120 compressions per minute to a depth of 5–6 cm.\n        Allow complete chest recoil between compressions."
+    },
+    {
+      "title": "Emergency Burn Management",
+      "category": "First Aid",
+      "snippet": "First, second, and third degree burn assessment and cooling protocols.",
+      "content": "Immediate Burn First Aid\n      Cool the burn with clean, cool running water for at least 20 minutes. Never use ice or butter. Cover loosely with clean plastic."
+    }
+  ]
 }

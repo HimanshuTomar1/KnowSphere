@@ -171,7 +171,7 @@ describe('KnowSphere Backend API & Security Suite', () => {
     });
   });
 
-  describe('Multilingual & French Knowledge Localization', () => {
+  describe('Multilingual Universal Knowledge Localization (8 Languages)', () => {
     it('GET /api/offline/articles/:zimId returns 100% French content for French packages', async () => {
       const res = await request(app).get('/api/offline/articles/wikipedia-fr-all');
       expect(res.status).toBe(200);
@@ -193,6 +193,75 @@ describe('KnowSphere Backend API & Security Suite', () => {
       expect(res.body.language).toBe('fr');
       const titles = res.body.articles.map(a => a.title).join(' ');
       expect(titles).toMatch(/Réanimation|Brûlures|Paludisme|SRO/i);
+    });
+
+    it('GET /api/offline/articles/:zimId returns 100% Spanish content for Spanish packages', async () => {
+      const res = await request(app).get('/api/offline/articles/wikipedia-es-all');
+      expect(res.status).toBe(200);
+      expect(res.body.language).toBe('es');
+      expect(res.body.articles.length).toBeGreaterThan(0);
+      const titles = res.body.articles.map(a => a.title).join(' ');
+      expect(titles).toMatch(/Bienvenido|Desinfección|Triaje|Búsqueda/i);
+      expect(titles).not.toMatch(/Welcome to KnowSphere/i);
+    });
+
+    it('GET /api/offline/articles/:zimId returns 100% Hindi content for Hindi packages', async () => {
+      const res = await request(app).get('/api/offline/articles/wikipedia-hi-all');
+      expect(res.status).toBe(200);
+      expect(res.body.language).toBe('hi');
+      expect(res.body.articles.length).toBeGreaterThan(0);
+      const titles = res.body.articles.map(a => a.title).join(' ');
+      expect(titles).toMatch(/नोस्फेयर|स्वागत|विसंक्रमण|प्रोटोकॉल/);
+      expect(titles).not.toMatch(/Welcome to KnowSphere/i);
+    });
+
+    it('GET /api/offline/articles/:zimId returns 100% Arabic content for Arabic packages', async () => {
+      const res = await request(app).get('/api/offline/articles/wikipedia-ar-all');
+      expect(res.status).toBe(200);
+      expect(res.body.language).toBe('ar');
+      expect(res.body.articles.length).toBeGreaterThan(0);
+      const titles = res.body.articles.map(a => a.title).join(' ');
+      expect(titles).toMatch(/مرحبًا|تعقيم|فرز/);
+      expect(titles).not.toMatch(/Welcome to KnowSphere/i);
+    });
+
+    it('GET /api/offline/articles/:zimId returns 100% Chinese content for Chinese packages', async () => {
+      const res = await request(app).get('/api/offline/articles/wikipedia-zh-all');
+      expect(res.status).toBe(200);
+      expect(res.body.language).toBe('zh');
+      expect(res.body.articles.length).toBeGreaterThan(0);
+      const titles = res.body.articles.map(a => a.title).join(' ');
+      expect(titles).toMatch(/欢迎来到|消毒|检伤分类/);
+      expect(titles).not.toMatch(/Welcome to KnowSphere/i);
+    });
+
+    it('GET /api/offline/articles/:zimId returns 100% German content for German packages', async () => {
+      const res = await request(app).get('/api/offline/articles/wikipedia-de-all');
+      expect(res.status).toBe(200);
+      expect(res.body.language).toBe('de');
+      expect(res.body.articles.length).toBeGreaterThan(0);
+      const titles = res.body.articles.map(a => a.title).join(' ');
+      expect(titles).toMatch(/Willkommen|Trinkwasserdesinfektion|Wiederbelebung/i);
+      expect(titles).not.toMatch(/Welcome to KnowSphere/i);
+    });
+
+    it('GET /api/offline/articles/:zimId returns 100% Portuguese content for Portuguese packages', async () => {
+      const res = await request(app).get('/api/offline/articles/wikipedia-pt-all');
+      expect(res.status).toBe(200);
+      expect(res.body.language).toBe('pt');
+      expect(res.body.articles.length).toBeGreaterThan(0);
+      const titles = res.body.articles.map(a => a.title).join(' ');
+      expect(titles).toMatch(/Bem-vindo|Desinfecção|Triagem|Ressuscitação/i);
+      expect(titles).not.toMatch(/Welcome to KnowSphere/i);
+    });
+
+    it('GET /api/offline/articles/:zimId returns English content for English packages', async () => {
+      const res = await request(app).get('/api/offline/articles/wikipedia-en-all');
+      expect(res.status).toBe(200);
+      expect(res.body.language).toBe('en');
+      expect(res.body.articles.length).toBeGreaterThan(0);
+      const titles = res.body.articles.map(a => a.title).join(' ');
+      expect(titles).toMatch(/Welcome to KnowSphere Offline Reader|Solar Water Disinfection/i);
     });
   });
 });
