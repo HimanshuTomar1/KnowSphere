@@ -471,12 +471,14 @@ app.post('/api/download/start', async (req, res) => {
     };
   }
 
+  const isFrench = (zim.language === 'fr') || (zim.id && (zim.id.includes('-fr') || zim.id.includes('_fr'))) || /français|french/i.test(zim.title || '');
   const downloadId = uuidv4();
   const dlRecord = {
     id: downloadId,
     downloadId,
     zimId: zim.id,
     title: zim.title,
+    language: isFrench ? 'fr' : (zim.language || 'en'),
     sizeBytes: zim.sizeBytes || 1.5e9,
     downloadedBytes: 0,
     status: 'downloading',
@@ -506,14 +508,26 @@ function tickDownload(downloadId) {
     dl.downloadedBytes = dl.sizeBytes;
 
     try {
+      const isFrench = (dl.language === 'fr') || dl.zimId.includes('-fr') || dl.zimId.includes('_fr') || /français|french/i.test(dl.title || '');
+      const articles = getOfflineArticlesForZim(dl.zimId, dl.title, dl.category, isFrench ? 'fr' : (dl.language || 'en'));
       const filePath = path.join(__dirname, 'downloads', `${dl.zimId}.zim`);
       const payload = {
         kiwixPackage: dl.title,
         zimId: dl.zimId,
-        sizeBytes: dl.sizeBytes,
+        langue: isFrench ? 'français (fr)' : (dl.language || 'english (en)'),
+        tailleOctets: dl.sizeBytes,
         sourceUrl: dl.sourceUrl,
-        downloadedAt: new Date().toISOString(),
-        verifiedOffline: true
+        dateTelechargement: new Date().toISOString(),
+        statutHorsLigne: isFrench ? 'Archive ZIM locale 100% vérifiée et prête' : 'Verified Local ZIM Archive',
+        description: isFrench 
+          ? `Archive hors-ligne complète pour ${dl.title}. Contenu 100% en langue française accessible sans connexion internet.`
+          : `Full offline archive for ${dl.title}. Verified offline repository.`,
+        articles: articles.map(a => ({
+          titre: a.title,
+          categorie: a.category,
+          resume: a.snippet,
+          contenu: a.content.replace(/<[^>]*>?/gm, '').trim()
+        }))
       };
       fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
       dl.localFilePath = filePath;
@@ -532,6 +546,7 @@ app.get('/api/offline/articles/:zimId', async (req, res) => {
   const { zimId } = req.params;
   let zimTitle = '';
   let zimCategory = '';
+  let zimLanguage = '';
 
   try {
     const allKnown = await getCombinedCatalogue();
@@ -539,13 +554,27 @@ app.get('/api/offline/articles/:zimId', async (req, res) => {
     if (found) {
       zimTitle = found.title;
       zimCategory = found.category;
+      zimLanguage = found.language;
     }
   } catch {}
 
-  const articles = getOfflineArticlesForZim(zimId, zimTitle, zimCategory);
+  if (!zimLanguage) {
+    const downloads = db.getDownloads();
+    const foundDl = Object.values(downloads).find(d => d.zimId === zimId || d.id === zimId);
+    if (foundDl) {
+      zimTitle = foundDl.title || zimTitle;
+      zimCategory = foundDl.category || zimCategory;
+      zimLanguage = foundDl.language || (foundDl.zimId && foundDl.zimId.includes('-fr') ? 'fr' : '');
+    }
+  }
+
+  const isFrench = (zimLanguage === 'fr') || (zimId && (zimId.includes('-fr') || zimId.includes('_fr'))) || /français|french/i.test(zimTitle || '');
+  const articles = getOfflineArticlesForZim(zimId, zimTitle, zimCategory, isFrench ? 'fr' : (zimLanguage || 'en'));
+  
   res.json({
     zimId,
     title: zimTitle,
+    language: isFrench ? 'fr' : (zimLanguage || 'en'),
     articles,
     offlineMode: true,
     lastSynced: new Date().toISOString(),
@@ -791,13 +820,25 @@ app.get('/api/download/:id/file', (req, res) => {
 
   const filePath = path.join(__dirname, 'downloads', `${dl.zimId}.zim`);
   if (!fs.existsSync(filePath)) {
+    const isFrench = (dl.language === 'fr') || (dl.zimId && (dl.zimId.includes('-fr') || dl.zimId.includes('_fr'))) || /français|french/i.test(dl.title || '');
+    const articles = getOfflineArticlesForZim(dl.zimId, dl.title, dl.category, isFrench ? 'fr' : (dl.language || 'en'));
     const payload = {
       kiwixPackage: dl.title,
       zimId: dl.zimId,
-      sizeBytes: dl.sizeBytes,
+      langue: isFrench ? 'français (fr)' : (dl.language || 'english (en)'),
+      tailleOctets: dl.sizeBytes,
       sourceUrl: dl.sourceUrl,
-      downloadedAt: new Date().toISOString(),
-      verifiedOffline: true
+      dateTelechargement: new Date().toISOString(),
+      statutHorsLigne: isFrench ? 'Archive ZIM locale 100% vérifiée et prête' : 'Verified Local ZIM Archive',
+      description: isFrench 
+        ? `Archive hors-ligne complète pour ${dl.title}. Contenu 100% en langue française accessible sans connexion internet.`
+        : `Full offline archive for ${dl.title}. Verified offline repository.`,
+      articles: articles.map(a => ({
+        titre: a.title,
+        categorie: a.category,
+        resume: a.snippet,
+        contenu: a.content.replace(/<[^>]*>?/gm, '').trim()
+      }))
     };
     fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf8');
   }

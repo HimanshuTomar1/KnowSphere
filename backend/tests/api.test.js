@@ -170,4 +170,29 @@ describe('KnowSphere Backend API & Security Suite', () => {
       expect(res.body.events.length).toBeGreaterThan(0);
     });
   });
+
+  describe('Multilingual & French Knowledge Localization', () => {
+    it('GET /api/offline/articles/:zimId returns 100% French content for French packages', async () => {
+      const res = await request(app).get('/api/offline/articles/wikipedia-fr-all');
+      expect(res.status).toBe(200);
+      expect(res.body.language).toBe('fr');
+      expect(Array.isArray(res.body.articles)).toBe(true);
+      expect(res.body.articles.length).toBeGreaterThan(0);
+
+      // Verify articles are strictly in French
+      const titles = res.body.articles.map(a => a.title).join(' ');
+      expect(titles).toMatch(/Bienvenue|Désinfection|Triage|Algorithmes/i);
+
+      // Ensure no default English placeholder leaks
+      expect(titles).not.toMatch(/Welcome to KnowSphere/i);
+    });
+
+    it('GET /api/offline/articles/:zimId returns French medical articles for WikiMed FR', async () => {
+      const res = await request(app).get('/api/offline/articles/wikimed-fr');
+      expect(res.status).toBe(200);
+      expect(res.body.language).toBe('fr');
+      const titles = res.body.articles.map(a => a.title).join(' ');
+      expect(titles).toMatch(/Réanimation|Brûlures|Paludisme|SRO/i);
+    });
+  });
 });

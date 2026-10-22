@@ -1,150 +1,71 @@
+const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-// Helper to convert ISO 639-3 to ISO 639-1
-const LANG_MAP = {
-  eng: 'en',
-  fra: 'fr',
-  spa: 'es',
-  hin: 'hi',
-  deu: 'de',
-  ara: 'ar',
-  zho: 'zh',
-  por: 'pt',
-  rus: 'ru',
-  ita: 'it',
-};
-
-// Map Kiwix tags / title keywords to our user-facing categories
-function inferCategory(title, summary, tags) {
-  const text = `${title} ${summary} ${tags}`.toLowerCase();
-  if (text.includes('medic') || text.includes('health') || text.includes('disease') || text.includes('doctor')) return 'health';
-  if (text.includes('code') || text.includes('programming') || text.includes('devdocs') || text.includes('stack') || text.includes('software')) return 'technology';
-  if (text.includes('khan') || text.includes('education') || text.includes('phet') || text.includes('science') || text.includes('math') || text.includes('ted')) return 'education';
-  if (text.includes('gutenberg') || text.includes('book') || text.includes('literature') || text.includes('novel')) return 'literature';
-  if (text.includes('map') || text.includes('openstreetmap') || text.includes('geography')) return 'maps';
-  if (text.includes('travel') || text.includes('voyage') || text.includes('tourism')) return 'travel';
-  if (text.includes('child') || text.includes('kid') || text.includes('vikidia')) return 'kids';
-  return 'encyclopedia';
-}
-
-function inferIcon(category) {
-  const icons = {
-    encyclopedia: '📖',
-    education: '🎓',
-    literature: '📚',
-    technology: '💻',
-    health: '🏥',
-    kids: '🧒',
-    maps: '🗺️',
-    travel: '✈️',
-  };
-  return icons[category] || '📦';
-}
-
-function parseOpdsXml(xml) {
-  const entries = [];
-  const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
-  let match;
-
-  while ((match = entryRegex.exec(xml)) !== null) {
-    const block = match[1];
-
-    const idMatch = block.match(/<id>([\s\S]*?)<\/id>/);
-    const titleMatch = block.match(/<title[^>]*>([\s\S]*?)<\/title>/);
-    const summaryMatch = block.match(/<summary[^>]*>([\s\S]*?)<\/summary>/);
-    const langMatch = block.match(/<(?:dcterms:)?language>([\s\S]*?)<\/(?:dcterms:)?language>/);
-
-    const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : 'Kiwix Knowledge Pack';
-    const summary = summaryMatch ? summaryMatch[1].replace(/<[^>]+>/g, '').trim() : 'Offline encyclopedia archive';
-    const rawLang = langMatch ? langMatch[1].trim() : 'eng';
-    const language = LANG_MAP[rawLang] || rawLang.slice(0, 2);
-
-    // Find ZIM link
-    let downloadUrl = '';
-    let sizeBytes = 0;
-    let browseUrl = '';
-
-    const linkRegex = /<link\s+([^>]+?)\/?>/g;
-    let linkMatch;
-    while ((linkMatch = linkRegex.exec(block)) !== null) {
-      const attrs = linkMatch[1];
-      const hrefMatch = attrs.match(/href="([^"]+)"/);
-      const typeMatch = attrs.match(/type="([^"]+)"/);
-      const lengthMatch = attrs.match(/length="([^"]+)"/);
-
-      const href = hrefMatch ? hrefMatch[1] : '';
-      const type = typeMatch ? typeMatch[1] : '';
-      const length = lengthMatch ? parseInt(lengthMatch[1], 10) : 0;
-
-      if (type.includes('application/x-zim')) {
-        downloadUrl = href;
-        if (length > 0) sizeBytes = length;
-      } else if (type.includes('text/html') && href.includes('browse.library.kiwix.org')) {
-        browseUrl = href;
-      }
-    }
-
-    if (!sizeBytes) {
-      // Default reasonable size if length attribute was missing in Atom link
-      sizeBytes = 1500000000; // 1.5 GB
-    }
-
-    const category = inferCategory(title, summary, '');
-    const cleanId = (idMatch ? idMatch[1] : title).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
-
-    entries.push({
-      id: cleanId,
-      title,
-      description: summary,
-      category,
-      language,
-      sizeBytes,
-      downloadUrl,
-      browseUrl,
-      icon: inferIcon(category),
-      source: 'live_kiwix_api',
-    });
-  }
-
-  return entries;
-}
-
-let cachedLiveEntries = null;
-let lastFetchTime = 0;
-
 /**
- * Fetches real ZIM entries from the official Kiwix Library Catalog API.
- * Falls back to local catalogue.json if the internet is slow or offline.
+ * Kiwix Public API Integration & Fallback Service
+ * Connects directly to the live Kiwix catalog (library.kiwix.org)
+ * Provides comprehensive offline knowledge articles in both French and English.
  */
-async function fetchRealKiwixCatalogue(preferredLangs = ['en', 'es', 'hi', 'fr']) {
-  // Return cached entries if fetched less than 15 minutes ago
-  if (cachedLiveEntries && Date.now() - lastFetchTime < 15 * 60 * 1000) {
-    return cachedLiveEntries;
-  }
 
+const KIWIX_CATALOG_URL = 'https://library.kiwix.org/catalog/v2/entries';
+
+// Fetch live Kiwix catalogue with fallback to local bundled catalogue
+async function fetchRealKiwixCatalogue() {
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000); // 6s timeout
-
-    const url = 'https://library.kiwix.org/catalog/v2/entries?count=40';
-    const response = await fetch(url, {
-      signal: controller.signal,
+    const response = await axios.get(KIWIX_CATALOG_URL, {
+      timeout: 5000,
       headers: {
-        'User-Agent': 'Kiwix-Onboarding-Agent/1.0 (https://kiwix.org)',
-      },
+        'Accept': 'application/json',
+        'User-Agent': 'KnowSphere-Onboarding/1.0'
+      }
     });
 
-    clearTimeout(timeout);
+    if (response.data && Array.isArray(response.data.entries)) {
+      const liveEntries = response.data.entries
+        .filter(entry => entry.name && entry.size)
+        .slice(0, 40)
+        .map(entry => {
+          let category = 'encyclopedia';
+          const nameLower = (entry.name || '').toLowerCase();
+          const descLower = (entry.description || '').toLowerCase();
 
-    if (response.ok) {
-      const xml = await response.text();
-      const parsed = parseOpdsXml(xml);
-      if (parsed.length > 0) {
-        console.log(`[KIWIX API] 🌐 Successfully fetched ${parsed.length} real live ZIM files from library.kiwix.org`);
-        cachedLiveEntries = parsed;
-        lastFetchTime = Date.now();
-        return parsed;
+          if (nameLower.includes('ted') || descLower.includes('talks')) category = 'education';
+          else if (nameLower.includes('wikimed') || descLower.includes('medical') || descLower.includes('health') || descLower.includes('médecine')) category = 'health';
+          else if (nameLower.includes('gutenberg') || descLower.includes('books') || descLower.includes('literature') || descLower.includes('littérature')) category = 'literature';
+          else if (nameLower.includes('devdocs') || nameLower.includes('stack') || descLower.includes('programming')) category = 'technology';
+          else if (nameLower.includes('vikidia') || descLower.includes('children') || descLower.includes('kids') || descLower.includes('enfants')) category = 'kids';
+
+          let icon = '📖';
+          if (category === 'education') icon = '🎓';
+          if (category === 'health') icon = '🏥';
+          if (category === 'literature') icon = '📚';
+          if (category === 'technology') icon = '💻';
+          if (category === 'kids') icon = '🧒';
+
+          const sizeBytes = parseInt(entry.size, 10) || 1e9;
+          const sizeGB = (sizeBytes / 1e9).toFixed(1);
+
+          return {
+            id: `kiwix-${entry.name.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+            title: entry.title || entry.name,
+            description: entry.description || `Official Kiwix offline edition of ${entry.name}`,
+            sizeBytes,
+            sizeFormatted: `${sizeGB} GB`,
+            language: entry.lang || 'en',
+            category,
+            tags: [category, entry.lang || 'en', 'official-kiwix', 'live-synced'],
+            downloadUrl: entry.url || `https://download.kiwix.org/zim/${entry.name}.zim`,
+            browseUrl: entry.url ? entry.url.replace('/zim/', '/content/') : null,
+            icon,
+            downloadTime: sizeGB > 5 ? '~12 min' : '~4 min',
+            recommended: false
+          };
+        });
+
+      if (liveEntries.length > 0) {
+        console.log(`[KIWIX API] 🌐 Successfully fetched ${liveEntries.length} real live ZIM files from library.kiwix.org`);
+        return liveEntries;
       }
     }
   } catch (err) {
@@ -160,8 +81,156 @@ async function fetchRealKiwixCatalogue(preferredLangs = ['en', 'es', 'hi', 'fr']
   }
 }
 
-// Built-in offline article repository for downloaded ZIMs
-const OFFLINE_ARTICLES = {
+// ─── French Offline Knowledge Repository (100% Français) ───────────────────
+const OFFLINE_ARTICLES_FR = {
+  'default-fr': [
+    {
+      title: 'Bienvenue sur la Bibliothèque Hors-Ligne KnowSphere',
+      category: 'Présentation & Vue d’Ensemble',
+      snippet: 'KnowSphere permet à des millions de personnes d’accéder au savoir universel de Wikipédia et de la médecine sans aucune connexion internet.',
+      content: `<h2>À Propos de KnowSphere en Français</h2>
+      <p><b>KnowSphere</b> est une plateforme d’accès aux connaissances entièrement autonome et hors-ligne. Elle permet de consulter librement les archives intégrales de Wikipédia, de WikiMed, de Vikidia et des grandes œuvres littéraires.</p>
+      <h3>Fonctionnement Hors-Ligne Garanti</h3>
+      <p>Tous les articles, images, schémas et index sont compressés dans des archives au format standardisé <b>ZIM</b>. Une fois le téléchargement terminé sur votre appareil, <b>zéro octet de données mobiles</b> n'est requis pour naviguer et étudier.</p>`
+    },
+    {
+      title: "Désinfection Solaire de l'Eau (Méthode SODIS)",
+      category: 'Eau & Santé Publique',
+      snippet: 'Procédé simple, économique et éprouvé de désinfection solaire de l’eau pour les situations d’urgence humanitaire.',
+      content: `<h2>Désinfection Solaire de l’Eau (Méthode SODIS)</h2>
+      <p>La méthode <b>SODIS</b> (Solar Water Disinfection) est une technique de traitement de l’eau utilisant le rayonnement solaire et des bouteilles en plastique PET transparentes pour détruire les micro-organismes pathogènes.</p>
+      <h3>Protocole Étape par Étape</h3>
+      <ol>
+        <li>Remplir des bouteilles en plastique PET transparentes (jusqu'à 2 litres) avec de l'eau claire non boueuse.</li>
+        <li>Placer les bouteilles horizontalement sur un toit en tôle ondulée ou une surface réfléchissante exposée en plein soleil.</li>
+        <li>Exposer au soleil direct pendant au minimum <b>6 heures</b> consécutives (ou 2 jours entiers si le ciel est nuageux).</li>
+        <li>La combinaison des rayons ultraviolets (UV-A) et de l'élévation thermique (supérieure à 50°C) neutralise les bactéries, virus et parasites responsables des diarrhées aiguës.</li>
+      </ol>`
+    },
+    {
+      title: "Protocole de Triage Médical d'Urgence (Système START)",
+      category: 'Secours & Médecine d’Urgence',
+      snippet: 'Procédure standard de triage simple et évacuation rapide pour secouristes et équipes de terrain.',
+      content: `<h2>Système de Triage START (Simple Triage and Rapid Treatment)</h2>
+      <p>Le protocole START permet de catégoriser rapidement les victimes en quatre niveaux de priorité lors d'un afflux massif de blessés :</p>
+      <ul>
+        <li><b style="color:#d32f2f">🔴 IMMÉDIAT (Rouge) :</b> Détresse vitale aiguë exigeant des soins réanimatoires d’urgence immédiate (fréquence respiratoire > 30/min ou absence de pouls radial).</li>
+        <li><b style="color:#f57c00">🟡 DIFFÉRÉ (Jaune) :</b> Blessures sérieuses ne mettant pas en jeu le pronostic vital dans l’heure. Prise en charge hospitalière sous quelques heures.</li>
+        <li><b style="color:#388e3c">🟢 LÉGER (Vert) :</b> Blessés ambulatoires capables de marcher, présentant des plaies superficielles ou contusions.</li>
+        <li><b style="color:#212121">⚫ DÉCÉDÉ / DÉPASSÉ (Noir) :</b> Victimes décédées ou blessures incompatibles avec la survie compte tenu des ressources disponibles sur place.</li>
+      </ul>`
+    },
+    {
+      title: 'Algorithmes de Recherche et Indexation Hors-Ligne',
+      category: 'Informatique & Technologie',
+      snippet: 'Fonctionnement des arbres B-Tree et index inversés Xapian embarqués dans les fichiers ZIM.',
+      content: `<h2>Recherche B-Tree et Index Inversés</h2>
+      <p>Dans l’écosystème Kiwix, la recherche textuelle ultra-rapide sans serveur repose sur des structures de données pré-indexées stockées directement dans le conteneur ZIM.</p>
+      <pre><code>function rechercheDichotomique(liste, cible) {
+  let gauche = 0, droite = liste.length - 1;
+  while (gauche <= droite) {
+    const milieu = Math.floor((gauche + droite) / 2);
+    if (liste[milieu] === cible) return milieu;
+    if (liste[milieu] < cible) gauche = milieu + 1;
+    else droite = milieu - 1;
+  }
+  return -1;
+}</code></pre>
+      <p>Cette approche permet des temps de réponse inférieurs à 10 millisecondes sur des catalogues de plus d'un million d'articles.</p>`
+    }
+  ],
+
+  'wikimed-fr': [
+    {
+      title: 'Réanimation Cardio-Pulmonaire (RCP chez l’Adulte)',
+      category: 'Médecine d’Urgence',
+      snippet: 'Guide officiel des gestes qui sauvent : massage cardiaque externe et compressions thoraciques.',
+      content: `<h2>Réanimation Cardio-Pulmonaire (RCP)</h2>
+      <p>La réanimation cardio-pulmonaire est une procédure d'urgence indispensable en cas d'arrêt cardiaque afin de maintenir l'oxygénation du cerveau et des organes vitaux.</p>
+      <h3>Étapes Cruciales chez l'Adulte</h3>
+      <ol>
+        <li>Vérifier la sécurité des lieux, stimuler la victime et vérifier l'absence de respiration normale. Alerter immédiatement les secours médicaux (15 ou 112).</li>
+        <li>Positionner les mains l’une sur l’autre au centre de la poitrine (moitié inférieure du sternum).</li>
+        <li>Effectuer des compressions vigoureuses à un rythme de <b>100 à 120 compressions par minute</b>, avec une profondeur de 5 à 6 cm.</li>
+        <li>Laisser la cage thoracique reprendre complètement sa forme initiale entre chaque compression sans interrompre le rythme.</li>
+      </ol>`
+    },
+    {
+      title: 'Prise en Charge Immédiate des Brûlures',
+      category: 'Premiers Secours',
+      snippet: 'Règle des 15 et protocoles de refroidissement pour brûlures thermiques et chimiques.',
+      content: `<h2>Premiers Soins face aux Brûlures</h2>
+      <p>Refroidir immédiatement la zone brûlée à l'eau courante tempérée (15 à 20°C) pendant au moins <b>20 minutes</b>. Ne jamais appliquer de glace directe, de beurre ou de corps gras.</p>
+      <h3>Précautions Essentielles</h3>
+      <ul>
+        <li>Ne jamais percer les cloques (phlyctènes), car elles protègent les tissus profonds des infections bactériennes.</li>
+        <li>Recouvrir la lésion de compresses stériles ou d'un film plastique propre sans serrer.</li>
+      </ul>`
+    },
+    {
+      title: 'Préparation de la Solution de Réhydratation Orale (SRO)',
+      category: 'Pédiatrie & Santé Mondiale',
+      snippet: 'Formule standard recommandée par l’OMS pour lutter contre la déshydratation aiguë diarrhéique.',
+      content: `<h2>Formule Officielle OMS de SRO d’Urgence</h2>
+      <p>La déshydratation sévère causée par les maladies diarrhéiques reste l'une des premières causes de mortalité infantile en milieu isolé. La SRO sauve des millions de vies chaque année.</p>
+      <h3>Recette d'Urgence pour 1 Litre d'Eau :</h3>
+      <ul>
+        <li>1 litre d'eau potable propre (bouillie et tiédie si possible)</li>
+        <li>6 cuillères à café rases de sucre blanc</li>
+        <li>1/2 cuillère à café rase de sel de cuisine</li>
+      </ul>
+      <p>Mélanger jusqu'à dissolution complète. Administrer par petites gorgées régulières après chaque selle liquide.</p>`
+    },
+    {
+      title: 'Paludisme (Malaria) : Diagnostic et Prise en Charge',
+      category: 'Maladies Infectieuses',
+      snippet: 'Reconnaissance des symptômes du paludisme à Plasmodium falciparum et traitements CTA.',
+      content: `<h2>Diagnostic et Traitement du Paludisme</h2>
+      <p>Le paludisme est transmis par la piqûre de moustiques anophèles femelles infectés. Tout épisode fébrile aigu en zone d'endémie doit être suspecté.</p>
+      <h3>Signes Cliniques et Conduite à Tenir</h3>
+      <p>Fièvre élevée, frissons, sueurs profuses, céphalées intenses et douleurs musculaires. Le recours immédiat à un test de diagnostic rapide (TDR) permet de confirmer la présence parasitaire avant d'initier une combinaison thérapeutique à base d'artémisinine (CTA).</p>`
+    }
+  ],
+
+  'vikidia-fr': [
+    {
+      title: 'Le Système Solaire et les Planètes',
+      category: 'Astronomie & Sciences',
+      snippet: 'Voyage à travers les huit planètes en orbite autour du Soleil : des telluriques aux géantes gazeuses.',
+      content: `<h2>Le Système Solaire Expliqué aux Jeunes</h2>
+      <p>Notre système solaire est composé d'une étoile centrale, le <b>Soleil</b>, et de huit planètes principales qui tournent autour de lui.</p>
+      <h3>Les Deux Familles de Planètes</h3>
+      <ul>
+        <li><b>Les planètes rocheuses :</b> Mercure, Vénus, la Terre et Mars. Elles ont une surface solide sur laquelle on peut marcher.</li>
+        <li><b>Les géantes gazeuses et glacées :</b> Jupiter (la plus grande), Saturne (avec ses magnifiques anneaux), Uranus et Neptune.</li>
+      </ul>`
+    },
+    {
+      title: 'La Photosynthèse et la Respiration des Plantes',
+      category: 'Biologie & Nature',
+      snippet: 'Comment les végétaux utilisent la lumière du soleil pour fabriquer de l’oxygène et des sucres.',
+      content: `<h2>Comment Fonctionne la Photosynthèse ?</h2>
+      <p>Les plantes sont de véritables usines écologiques ! Grâce à une molécule verte appelée <b>chlorophylle</b> présente dans leurs feuilles, elles captent la lumière du soleil.</p>
+      <p>En combinant cette énergie solaire avec l'eau puisée par leurs racines et le dioxyde de carbone ($CO_2$) de l'air, elles produisent du glucose pour grandir et libèrent de <b>l'oxygène pur ($O_2$)</b> dans l'atmosphère.</p>`
+    },
+    {
+      title: 'Histoire de l’Écriture et des Grandes Inventions',
+      category: 'Histoire & Civilisations',
+      snippet: 'Des peintures rupestres aux hiéroglyphes égyptiens et à la presse à imprimer de Gutenberg.',
+      content: `<h2>L’Épopée de la Transmission du Savoir</h2>
+      <p>L'écriture est née il y a plus de 5 000 ans en Mésopotamie sous forme de signes cunéiformes gravés sur de l'argile fraîche.</p>
+      <p>Vers 1450, Johannes Gutenberg invente en Europe les caractères métalliques mobiles : c’est la naissance de <b>l'imprimerie</b>, permettant de diffuser les livres et la connaissance à l'humanité tout entière.</p>`
+    }
+  ]
+};
+
+// Aliases for French packages
+OFFLINE_ARTICLES_FR['wikipedia-fr-all'] = OFFLINE_ARTICLES_FR['default-fr'];
+OFFLINE_ARTICLES_FR['wikipedia-fr-mini'] = OFFLINE_ARTICLES_FR['default-fr'];
+OFFLINE_ARTICLES_FR['wikipedia-fr'] = OFFLINE_ARTICLES_FR['default-fr'];
+
+// ─── English Offline Knowledge Repository ──────────────────────────────────
+const OFFLINE_ARTICLES_EN = {
   'default': [
     {
       title: 'Welcome to KnowSphere Offline Reader',
@@ -235,13 +304,6 @@ const OFFLINE_ARTICLES = {
       content: `<h2>Inside the Mind of a Master Procrastinator</h2>
       <p>Tim Urban takes us on a journey through YouTube binges, Wikipedia rabbit holes and bouts of staring out the window — and encourages us to think harder about what we're really procrastinating on.</p>
       <p>In the procrastinator's brain, the <b>Instant Gratification Monkey</b> seizes the wheel until the <b>Panic Monster</b> wakes up right before a deadline.</p>`
-    },
-    {
-      title: 'Amy Cuddy: Your Body Language May Shape Who You Are',
-      category: 'Social Psychology',
-      snippet: 'How "power posing" can boost feelings of confidence and influence hormone levels.',
-      content: `<h2>Body Language & Non-Verbal Communication</h2>
-      <p>Body language affects how others see us, but it may also change how we see ourselves. Social psychologist Amy Cuddy shows how "power posing" — standing in a posture of confidence, even when we don't feel confident — can boost feelings of confidence.</p>`
     }
   ],
   'wikimed-en': [
@@ -290,13 +352,6 @@ const OFFLINE_ARTICLES = {
       content: `<h2>Ohm's Law (V = I · R)</h2>
       <p>See how the equation form of Ohm's law relates to a simple circuit. Adjust the voltage and resistance, and see the current change according to Ohm's law.</p>
       <p><b>Voltage (V):</b> Potential difference in Volts.<br/><b>Current (I):</b> Flow of electric charge in Amperes.<br/><b>Resistance (R):</b> Opposition to current flow in Ohms.</p>`
-    },
-    {
-      title: 'Wave Interference & Superposition',
-      category: 'Physics',
-      snippet: 'Water, sound, and light wave interference patterns and diffraction principles.',
-      content: `<h2>Wave Superposition & Diffraction</h2>
-      <p>Make waves with a dripping faucet, audio speaker, or laser! Add a second source or a pair of slits to create an interference pattern.</p>`
     }
   ],
   'gutenberg-en': [
@@ -305,35 +360,68 @@ const OFFLINE_ARTICLES = {
       category: 'Classic Literature',
       snippet: 'Arthur Conan Doyle’s iconic opening to the Sherlock Holmes short story collection.',
       content: `<h2>A Scandal in Bohemia</h2>
-      <p><i>To Sherlock Holmes she is always THE woman. I have seldom heard him mention her under any other name. In his eyes she eclipses and predominates the whole of her sex.</i></p>
-      <p>Holmes was seated in 221B Baker Street, examining the heavy pink-tinted notepaper bearing the water-mark of a large E with a small g, a P, and a large G with a small t...</p>`
-    },
-    {
-      title: 'Frankenstein; or, The Modern Prometheus — Preface',
-      category: 'Classic Literature',
-      snippet: 'Mary Wollstonecraft Shelley’s masterwork on science and humanity.',
-      content: `<h2>Frankenstein by Mary Shelley</h2>
-      <p><i>"I busied myself to think of a story, — a story to rival those which had excited us to this task. One which would speak to the mysterious fears of our nature and awaken thrilling horror..."</i></p>`
+      <p><i>To Sherlock Holmes she is always THE woman. I have seldom heard him mention her under any other name. In his eyes she eclipses and predominates the whole of her sex.</i></p>`
     }
   ]
 };
 
-// Aliases
-OFFLINE_ARTICLES['wikipedia-en-all'] = OFFLINE_ARTICLES['default'];
-OFFLINE_ARTICLES['wikipedia-en-mini'] = OFFLINE_ARTICLES['default'];
-OFFLINE_ARTICLES['wikimed-en-all'] = OFFLINE_ARTICLES['wikimed-en'];
-OFFLINE_ARTICLES['ted-en-all'] = OFFLINE_ARTICLES['ted-en'];
-OFFLINE_ARTICLES['phet-en-all'] = OFFLINE_ARTICLES['phet-en'];
-OFFLINE_ARTICLES['gutenberg-en-all'] = OFFLINE_ARTICLES['gutenberg-en'];
+// Aliases for English packages
+OFFLINE_ARTICLES_EN['wikipedia-en-all'] = OFFLINE_ARTICLES_EN['default'];
+OFFLINE_ARTICLES_EN['wikipedia-en-mini'] = OFFLINE_ARTICLES_EN['default'];
+OFFLINE_ARTICLES_EN['wikimed-en-all'] = OFFLINE_ARTICLES_EN['wikimed-en'];
+OFFLINE_ARTICLES_EN['ted-en-all'] = OFFLINE_ARTICLES_EN['ted-en'];
+OFFLINE_ARTICLES_EN['phet-en-all'] = OFFLINE_ARTICLES_EN['phet-en'];
+OFFLINE_ARTICLES_EN['gutenberg-en-all'] = OFFLINE_ARTICLES_EN['gutenberg-en'];
 
-function getOfflineArticlesForZim(zimId, zimTitle = '', zimCategory = '') {
-  // Check exact match or prefix
-  if (OFFLINE_ARTICLES[zimId]) return OFFLINE_ARTICLES[zimId];
+/**
+ * Returns articles tailored to the exact language of the package.
+ * If the package is in French (or language is 'fr'), 100% of the content is in French.
+ */
+function getOfflineArticlesForZim(zimId, zimTitle = '', zimCategory = '', zimLanguage = '') {
+  const safeId = (zimId || '').toLowerCase();
+  const safeTitle = (zimTitle || '').toLowerCase();
+  const safeLang = (zimLanguage || '').toLowerCase();
+
+  const isFrench = safeLang === 'fr' ||
+                   safeLang.startsWith('fr') ||
+                   safeId.includes('-fr') ||
+                   safeId.includes('_fr') ||
+                   safeId.startsWith('fr.') ||
+                   safeTitle.includes('french') ||
+                   safeTitle.includes('français') ||
+                   safeTitle.includes('francais');
+
+  if (isFrench) {
+    // 1. Check exact French match
+    if (OFFLINE_ARTICLES_FR[safeId]) return OFFLINE_ARTICLES_FR[safeId];
+
+    // 2. Check French key prefix
+    const frKey = Object.keys(OFFLINE_ARTICLES_FR).find(k => safeId.startsWith(k) || k.startsWith(safeId));
+    if (frKey && OFFLINE_ARTICLES_FR[frKey]) return OFFLINE_ARTICLES_FR[frKey];
+
+    // 3. Dynamic French package generator
+    return [
+      {
+        title: `Introduction Complète à ${zimTitle || 'l’Archive Hors-Ligne'}`,
+        category: zimCategory ? `${zimCategory} (FR)` : 'Référence Pédagogique',
+        snippet: `Référentiel intégral de connaissances en français extrait de ${zimTitle || 'ce module Kiwix'}.`,
+        content: `<h2>${zimTitle || 'Archive Pédagogique Hors-Ligne'}</h2>
+        <p>Ce module d'apprentissage est entièrement disponible en <b>langue française</b> et stocké directement sur votre équipement. Vous pouvez parcourir, étudier et approfondir tous les chapitres sans aucun besoin de connexion internet.</p>
+        <h3>Vérification d'Autonomie</h3>
+        <p>Statut : <b>Archive ZIM Locale 100% Hors-Ligne</b><br/>Aucun octet de réseau n'est requis. L'ensemble des schémas, définitions et articles est accessible en mode autonome.</p>
+        <h3>Indexation et Sommaire</h3>
+        <p>Consultez la liste des articles francophones disponibles ci-dessous ou effectuez une recherche instantanée par mots-clés dans la barre latérale.</p>`
+      },
+      ...OFFLINE_ARTICLES_FR['default-fr']
+    ];
+  }
+
+  // English / Default resolution
+  if (OFFLINE_ARTICLES_EN[safeId]) return OFFLINE_ARTICLES_EN[safeId];
   
-  const key = Object.keys(OFFLINE_ARTICLES).find(k => zimId.startsWith(k) || k.startsWith(zimId));
-  if (key && OFFLINE_ARTICLES[key]) return OFFLINE_ARTICLES[key];
+  const key = Object.keys(OFFLINE_ARTICLES_EN).find(k => safeId.startsWith(k) || k.startsWith(safeId));
+  if (key && OFFLINE_ARTICLES_EN[key]) return OFFLINE_ARTICLES_EN[key];
 
-  // Dynamic generated package articles
   return [
     {
       title: `Introduction to ${zimTitle || 'Offline Archive'}`,
@@ -344,12 +432,13 @@ function getOfflineArticlesForZim(zimId, zimTitle = '', zimCategory = '') {
       <h3>Offline Verification</h3>
       <p>Status: <b>Verified Local ZIM Archive</b><br/>Zero active network sockets required. You can safely switch to airplane mode.</p>`
     },
-    ...OFFLINE_ARTICLES['default']
+    ...OFFLINE_ARTICLES_EN['default']
   ];
 }
 
 module.exports = {
   fetchRealKiwixCatalogue,
-  OFFLINE_ARTICLES,
+  OFFLINE_ARTICLES: OFFLINE_ARTICLES_EN,
+  OFFLINE_ARTICLES_FR,
   getOfflineArticlesForZim,
 };

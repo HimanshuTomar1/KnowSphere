@@ -5,7 +5,7 @@ import KnowSphereLogo from './KnowSphereLogo';
 /**
  * OfflineReaderModal — Dynamic Offline Knowledge Reader
  * Strictly displays and navigates ONLY files that have been downloaded (status === 'completed').
- * Allows seamless switching between all downloaded offline packs.
+ * Fully localizes content and reader UI into French when reading French packages.
  */
 export default function OfflineReaderModal({
   isOpen,
@@ -70,6 +70,23 @@ export default function OfflineReaderModal({
     prevIsOpenRef.current = true;
   }, [isOpen, zimPack, downloadedFiles, activePack]);
 
+  // Check if current active pack is in French
+  const isFrench = useMemo(() => {
+    if (!activePack) return false;
+    const safeLang = (activePack.language || '').toLowerCase();
+    const safeId = (activePack.zimId || activePack.id || '').toLowerCase();
+    const safeTitle = (activePack.title || '').toLowerCase();
+
+    return safeLang === 'fr' ||
+           safeLang.startsWith('fr') ||
+           safeId.includes('-fr') ||
+           safeId.includes('_fr') ||
+           safeId.startsWith('fr.') ||
+           safeTitle.includes('french') ||
+           safeTitle.includes('français') ||
+           safeTitle.includes('francais');
+  }, [activePack]);
+
   // ── 3. Fetch offline articles dynamically for the selected pack ───
   useEffect(() => {
     if (!isOpen || !activePack) return;
@@ -89,8 +106,18 @@ export default function OfflineReaderModal({
         }
       })
       .catch(() => {
-        // Safe offline fallback
-        const fallback = [
+        // Safe localized offline fallback
+        const fallback = isFrench ? [
+          {
+            title: `Introduction à ${activePack.title || 'l’Archive Hors-Ligne'}`,
+            category: 'Référence Pédagogique',
+            snippet: 'Contenu intégral disponible hors-ligne sur votre appareil.',
+            content: `<h2>${activePack.title || 'Archive Pédagogique Hors-Ligne'}</h2>
+            <p>Ce module d'apprentissage est entièrement disponible en <b>langue française</b> et stocké directement sur votre équipement. Vous pouvez parcourir, étudier et approfondir tous les chapitres sans aucun besoin de connexion internet.</p>
+            <h3>Vérification d'Autonomie</h3>
+            <p>Statut : <b>Archive ZIM Locale 100% Hors-Ligne</b><br/>Taille vérifiée : <b>${activePack.totalFormatted || 'Archive Locale'}</b>. Aucun octet de réseau n'est requis.</p>`
+          }
+        ] : [
           {
             title: `Introduction to ${activePack.title || 'Offline Archive'}`,
             category: 'Offline Reference',
@@ -105,7 +132,7 @@ export default function OfflineReaderModal({
         setSelectedArticle(fallback[0]);
       })
       .finally(() => setLoading(false));
-  }, [isOpen, activePack]);
+  }, [isOpen, activePack, isFrench]);
 
   if (!isOpen) return null;
 
@@ -158,16 +185,20 @@ export default function OfflineReaderModal({
             <KnowSphereLogo size={28} color="#ffffff" />
             <div>
               <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 700 }}>
-                KnowSphere Offline Reader
+                {isFrench ? 'Lecteur Hors-Ligne KnowSphere' : 'KnowSphere Offline Reader'}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--k-slate-400)', marginTop: 2 }}>
                 <span style={{
                   background: '#10B981', color: '#fff', padding: '1px 7px', borderRadius: 99,
                   fontWeight: 700, fontSize: 10, letterSpacing: 0.2
                 }}>
-                  ● 100% OFFLINE
+                  {isFrench ? '● 100% HORS-LIGNE' : '● 100% OFFLINE'}
                 </span>
-                <span>Zero Internet Required · {downloadedFiles.length} Downloaded Pack{downloadedFiles.length !== 1 ? 's' : ''} Ready</span>
+                <span>
+                  {isFrench
+                    ? `Zéro Internet Requis · ${downloadedFiles.length} Fichier${downloadedFiles.length > 1 ? 's' : ''} Prêt${downloadedFiles.length > 1 ? 's' : ''}`
+                    : `Zero Internet Required · ${downloadedFiles.length} Downloaded Pack${downloadedFiles.length !== 1 ? 's' : ''} Ready`}
+                </span>
               </div>
             </div>
           </div>
@@ -204,10 +235,12 @@ export default function OfflineReaderModal({
               letterSpacing: 0.5,
               textTransform: 'uppercase'
             }}>
-              📚 Downloaded Files in Your Offline Library ({downloadedFiles.length}):
+              {isFrench
+                ? `📚 Archives Téléchargées dans Votre Bibliothèque (${downloadedFiles.length}) :`
+                : `📚 Downloaded Files in Your Offline Library (${downloadedFiles.length}):`}
             </div>
             <div style={{ fontSize: 10, color: '#0071E3', fontWeight: 700 }}>
-              Showing only completed local files
+              {isFrench ? 'Fichiers locaux vérifiés' : 'Showing only completed local files'}
             </div>
           </div>
 
@@ -221,7 +254,9 @@ export default function OfflineReaderModal({
           }}>
             {downloadedFiles.length === 0 ? (
               <div style={{ fontSize: 12, color: '#6E6E73', padding: '4px 0' }}>
-                No completed downloads yet. Download files in Step 6 to read them offline.
+                {isFrench
+                  ? "Aucun téléchargement terminé. Téléchargez des fichiers à l'étape 6 pour les lire hors-ligne."
+                  : "No completed downloads yet. Download files in Step 6 to read them offline."}
               </div>
             ) : (
               downloadedFiles.map(dl => {
@@ -251,7 +286,7 @@ export default function OfflineReaderModal({
                       whiteSpace: 'nowrap',
                       transition: 'all 0.15s ease',
                     }}
-                    title={`Switch reader to ${dl.title}`}
+                    title={isFrench ? `Basculer vers ${dl.title}` : `Switch reader to ${dl.title}`}
                   >
                     <span style={{ fontSize: 14 }}>{dl.icon || '📦'}</span>
                     <span>{dl.title}</span>
@@ -263,11 +298,11 @@ export default function OfflineReaderModal({
                       background: isActive ? 'rgba(255,255,255,0.22)' : '#F2F2F7',
                       color: isActive ? '#FFFFFF' : '#6E6E73',
                     }}>
-                      {dl.totalFormatted || 'Offline'}
+                      {dl.totalFormatted || (isFrench ? 'Hors-Ligne' : 'Offline')}
                     </span>
                     {isActive && (
                       <span style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 900 }}>
-                        ✓ Open
+                        {isFrench ? '✓ Ouvert' : '✓ Open'}
                       </span>
                     )}
                   </button>
@@ -311,7 +346,7 @@ export default function OfflineReaderModal({
                     {activePack.title}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--k-text3)', marginTop: 1 }}>
-                    {activePack.totalFormatted} · Verified Local ZIM Archive
+                    {activePack.totalFormatted} · {isFrench ? 'Archive ZIM Locale Vérifiée' : 'Verified Local ZIM Archive'}
                   </div>
                 </div>
                 <span style={{
@@ -323,7 +358,7 @@ export default function OfflineReaderModal({
                   borderRadius: 6,
                   flexShrink: 0
                 }}>
-                  ✅ Cached
+                  {isFrench ? '✅ En Cache' : '✅ Cached'}
                 </span>
               </div>
             )}
@@ -334,7 +369,9 @@ export default function OfflineReaderModal({
                 type="text"
                 className="field-input"
                 style={{ padding: '7px 12px', fontSize: 12, background: 'var(--k-bg)' }}
-                placeholder={`🔍 Search in ${activePack?.title ? activePack.title.split(' ')[0] : 'pack'}…`}
+                placeholder={isFrench
+                  ? `🔍 Rechercher dans ${activePack?.title ? activePack.title.split(' ')[0] : 'l’archive'}…`
+                  : `🔍 Search in ${activePack?.title ? activePack.title.split(' ')[0] : 'pack'}…`}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
@@ -345,11 +382,13 @@ export default function OfflineReaderModal({
               {loading ? (
                 <div className="loader" style={{ padding: 28 }}>
                   <div className="spinner" />
-                  <span style={{ fontSize: 12 }}>Opening offline index…</span>
+                  <span style={{ fontSize: 12 }}>
+                    {isFrench ? 'Ouverture de l’index hors-ligne…' : 'Opening offline index…'}
+                  </span>
                 </div>
               ) : filteredArticles.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 28, fontSize: 12, color: 'var(--k-text3)' }}>
-                  No matching offline articles found.
+                  {isFrench ? 'Aucun article correspondant trouvé.' : 'No matching offline articles found.'}
                 </div>
               ) : (
                 filteredArticles.map((art, idx) => {
@@ -377,7 +416,7 @@ export default function OfflineReaderModal({
                         {art.title}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--k-text3)', lineHeight: 1.3 }}>
-                        {art.snippet || 'Offline reference text'}
+                        {art.snippet || (isFrench ? 'Extrait de référence hors-ligne' : 'Offline reference text')}
                       </div>
                     </div>
                   );
@@ -395,8 +434,12 @@ export default function OfflineReaderModal({
               alignItems: 'center',
               justifyContent: 'space-between'
             }}>
-              <span>📦 {articles.length} articles indexed</span>
-              <span style={{ color: '#16A34A', fontWeight: 800 }}>✓ Local</span>
+              <span>
+                📦 {articles.length} {isFrench ? `article${articles.length > 1 ? 's' : ''} indexé${articles.length > 1 ? 's' : ''}` : 'articles indexed'}
+              </span>
+              <span style={{ color: '#16A34A', fontWeight: 800 }}>
+                {isFrench ? '✓ Local' : '✓ Local'}
+              </span>
             </div>
           </div>
 
@@ -409,10 +452,10 @@ export default function OfflineReaderModal({
                     fontSize: 11, fontWeight: 800, background: 'var(--k-bg2)',
                     color: 'var(--k-text2)', padding: '2px 8px', borderRadius: 99
                   }}>
-                    {selectedArticle.category || 'Article'}
+                    {selectedArticle.category || (isFrench ? 'Article' : 'Article')}
                   </span>
                   <span style={{ fontSize: 11, color: 'var(--k-text3)' }}>
-                    {activePack?.title} · Cached Offline
+                    {activePack?.title} · {isFrench ? 'Mis en cache hors-ligne' : 'Cached Offline'}
                   </span>
                 </div>
 
@@ -451,13 +494,23 @@ export default function OfflineReaderModal({
                 }}>
                   <span style={{ fontSize: 22 }}>✅</span>
                   <div style={{ fontSize: 12, color: '#1B5E20', lineHeight: 1.4 }}>
-                    <strong>Verified Offline Reading</strong>: Loaded from physical local manifest <code>{activePack?.zimId || 'pack'}.zim</code> with zero network requests. You can browse completely off-grid.
+                    {isFrench ? (
+                      <>
+                        <strong>Lecture Hors-Ligne Vérifiée</strong> : Contenu extrait directement du manifeste local <code>{activePack?.zimId || 'archive'}.zim</code> sans aucune requête réseau externe. Navigation intégrale en mode avion.
+                      </>
+                    ) : (
+                      <>
+                        <strong>Verified Offline Reading</strong>: Loaded from physical local manifest <code>{activePack?.zimId || 'pack'}.zim</code> with zero network requests. You can browse completely off-grid.
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: 60, color: 'var(--k-text3)' }}>
-                Select an article from the left to read.
+                {isFrench
+                  ? 'Sélectionnez un article dans la liste à gauche pour commencer votre lecture.'
+                  : 'Select an article from the left to read.'}
               </div>
             )}
           </div>
