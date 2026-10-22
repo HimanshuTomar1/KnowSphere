@@ -26,6 +26,32 @@ kiwix-onboarding/
     │       └── CompleteStep.jsx         # Offline-ready state
     └── package.json           # Proxy → http://localhost:5000
 ```
+Structural Flow & System Architecture
+
+ End-to-End 7-Step Onboarding & Dynamic TTFR Flow
+
+[SplashScreen]
+      │ (Initializes sessionStart & startTime at 0:00)
+      ▼
+[Step 1: WelcomeStep] ──────► (Optional: 1-Click Quick Setup pre-fills Steps 2–5 & jumps to Step 6)
+      │
+      ▼
+[Step 2: InterestsStep] ────► Fetches GET /api/categories -> User selects topic categories
+      │
+      ▼
+[Step 3: LanguageStep] ─────► Fetches GET /api/languages  -> User selects content languages (en, hi, es, fr, ar, zh, de, pt)
+      │
+      ▼
+[Step 4: StorageStep] ──────► Runs navigator.storage.estimate() & persist() -> Sets GB budget + network speed (Mbps)
+      │
+      ▼
+[Step 5: RecommendationsStep] ► Syncs POST /api/session & queries GET /api/recommendations -> User selects ZIM packs
+      │
+      ▼
+[Step 6: DownloadStep] ─────► Triggers POST /api/download/start -> Polls GET /api/downloads every 700ms until allDone
+      │
+      ▼
+[Step 7: CompleteStep] ─────► All 7 steps completed -> Locks firstResourceTime & actualTtfrSec -> Launches OfflineReaderModal
 
 ## Quick start
 
