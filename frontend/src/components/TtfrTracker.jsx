@@ -7,34 +7,38 @@ import React, { useState, useEffect } from 'react';
 export default function TtfrTracker({
   startTime,
   firstResourceTime,
-  stepIndex,
+  stepIndex = 0,
   onOpenDetails
 }) {
-  const isCompleted = !!firstResourceTime || (typeof stepIndex === 'number' && stepIndex >= 6);
+  // All seven steps completed when stepIndex >= 6 (Step 7 of 7: Complete / Ready)
+  const isCompleted = typeof stepIndex === 'number' && stepIndex >= 6;
 
   const [elapsedSeconds, setElapsedSeconds] = useState(() => {
-    if (firstResourceTime && startTime) {
-      return Math.max(1, Math.round((firstResourceTime - startTime) / 1000));
-    }
     const origin = startTime || Date.now();
+    if (isCompleted && firstResourceTime) {
+      return Math.max(1, Math.round((firstResourceTime - origin) / 1000));
+    }
     return Math.max(0, Math.round((Date.now() - origin) / 1000));
   });
 
   useEffect(() => {
-    if (isCompleted && startTime) {
+    const origin = startTime || Date.now();
+
+    // Permanently stop the live timer once all seven steps are completed
+    if (isCompleted) {
       if (firstResourceTime) {
-        setElapsedSeconds(Math.max(1, Math.round((firstResourceTime - startTime) / 1000)));
+        setElapsedSeconds(Math.max(1, Math.round((firstResourceTime - origin) / 1000)));
       }
-      return; // Permanently stop the live timer when setup is complete or first resource ready
+      return;
     }
 
-    const origin = startTime || Date.now();
-    setElapsedSeconds(Math.max(0, Math.round((Date.now() - origin) / 1000)));
-
-    const interval = setInterval(() => {
+    // Keep dynamic clock ticking live second-by-second across steps 1 through 6
+    const tick = () => {
       setElapsedSeconds(Math.max(0, Math.round((Date.now() - origin) / 1000)));
-    }, 1000);
+    };
 
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [startTime, firstResourceTime, isCompleted]);
 

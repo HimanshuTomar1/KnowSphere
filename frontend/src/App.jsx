@@ -122,32 +122,17 @@ export default function App() {
     return () => clearInterval(timer);
   }, [state.stepIndex, showSplash]);
 
-  // Detect when first resource becomes ready in THIS onboarding session
+  // Stop TTFR strictly when all seven steps are completed (stepIndex === 6, "complete" step).
+  // Remains 100% dynamic and live across steps 1 through 6.
   useEffect(() => {
-    if (!firstResourceTime && Array.isArray(state.downloads) && state.downloads.length > 0) {
-      const completedPack = state.downloads.find(d => d.status === 'completed');
-      if (completedPack) {
-        const now = Date.now();
-        setFirstResourceTime(now);
-        const elapsed = Math.max(1, Math.round((now - startTime) / 1000));
-        setTelemetry(prev => ({
-          ...prev,
-          actualTtfrSec: prev.actualTtfrSec || elapsed,
-        }));
-      }
-    }
-  }, [state.downloads, firstResourceTime, startTime]);
-
-  // When setup is complete (reached Step 7: Ready / CompleteStep), stop TTFR immediately if not already stopped
-  useEffect(() => {
-    const isSetupComplete = (state.stepIndex >= 6) || (STEPS[state.stepIndex]?.id === 'complete');
-    if (isSetupComplete && !firstResourceTime) {
+    const isAllStepsCompleted = (state.stepIndex >= 6) || (STEPS[state.stepIndex]?.id === 'complete');
+    if (isAllStepsCompleted && !firstResourceTime) {
       const now = Date.now();
       setFirstResourceTime(now);
       const elapsed = Math.max(1, Math.round((now - startTime) / 1000));
       setTelemetry(prev => ({
         ...prev,
-        actualTtfrSec: prev.actualTtfrSec || elapsed,
+        actualTtfrSec: elapsed,
       }));
     }
   }, [state.stepIndex, firstResourceTime, startTime]);
@@ -256,9 +241,9 @@ export default function App() {
 
   const { stepIndex } = state;
 
-  const ttfrSeconds = firstResourceTime
+  const ttfrSeconds = (stepIndex >= 6 && firstResourceTime)
     ? Math.round((firstResourceTime - startTime) / 1000)
-    : (telemetry?.actualTtfrSec || Math.round((Date.now() - startTime) / 1000));
+    : Math.max(1, Math.round((Date.now() - startTime) / 1000));
 
   // Dynamic calculation of storage consumption across selection and active downloads
   const selectedPacksBytes = (state.selectedZims || []).reduce((acc, id) => {
