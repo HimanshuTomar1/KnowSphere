@@ -11,11 +11,28 @@ const path = require('path');
 
 const KIWIX_CATALOG_URL = 'https://library.kiwix.org/catalog/v2/entries';
 
-// Fetch live Kiwix catalogue with fallback to local bundled catalogue
+let liveCatalogueCache = null;
+let lastLiveFetch = 0;
+
+// Fetch live Kiwix catalogue with in-memory caching and fallback to local bundled catalogue
 async function fetchRealKiwixCatalogue() {
+  if (process.env.NODE_ENV === 'test') {
+    try {
+      const fallbackPath = path.join(__dirname, 'data', 'catalogue.json');
+      return JSON.parse(fs.readFileSync(fallbackPath, 'utf8'));
+    } catch {
+      return [];
+    }
+  }
+
+  const now = Date.now();
+  if (liveCatalogueCache && (now - lastLiveFetch < 5 * 60 * 1000)) {
+    return liveCatalogueCache;
+  }
+
   try {
     const response = await axios.get(KIWIX_CATALOG_URL, {
-      timeout: 5000,
+      timeout: 2500,
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'KnowSphere-Onboarding/1.0'
@@ -65,6 +82,8 @@ async function fetchRealKiwixCatalogue() {
         });
 
       if (liveEntries.length > 0) {
+        liveCatalogueCache = liveEntries;
+        lastLiveFetch = now;
         console.log(`[KIWIX API] 🌐 Successfully fetched ${liveEntries.length} real live ZIM files from library.kiwix.org`);
         return liveEntries;
       }

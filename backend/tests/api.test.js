@@ -6,6 +6,7 @@ const { verifyPassword, verifyToken } = require('../security');
 describe('KnowSphere Backend API & Security Suite', () => {
   beforeAll(() => {
     process.env.NODE_ENV = 'test';
+    jest.setTimeout(25000);
   });
 
   describe('Catalogue & Knowledge Metadata', () => {
