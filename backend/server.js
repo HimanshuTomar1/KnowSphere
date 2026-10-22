@@ -541,9 +541,10 @@ function tickDownload(downloadId) {
 
 app.get('/api/offline/articles/:zimId', async (req, res) => {
   const { zimId } = req.params;
+  const queryLang = (req.query.lang || req.query.language || '').toLowerCase().trim();
   let zimTitle = '';
   let zimCategory = '';
-  let zimLanguage = '';
+  let zimLanguage = queryLang;
 
   try {
     const allKnown = await getCombinedCatalogue();
@@ -551,7 +552,7 @@ app.get('/api/offline/articles/:zimId', async (req, res) => {
     if (found) {
       zimTitle = found.title;
       zimCategory = found.category;
-      zimLanguage = found.language;
+      if (!zimLanguage) zimLanguage = found.language;
     }
   } catch {}
 

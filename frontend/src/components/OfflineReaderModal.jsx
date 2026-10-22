@@ -79,13 +79,37 @@ export function resolvePackLang(pack) {
   const safeId = (pack.zimId || pack.id || '').toLowerCase().trim();
   const safeTitle = (pack.title || '').toLowerCase().trim();
 
-  if (safeLang.startsWith('fr') || safeId.includes('-fr') || safeId.includes('_fr') || safeTitle.includes('french') || safeTitle.includes('français')) return 'fr';
-  if (safeLang.startsWith('es') || safeId.includes('-es') || safeId.includes('_es') || safeTitle.includes('spanish') || safeTitle.includes('español')) return 'es';
-  if (safeLang.startsWith('hi') || safeId.includes('-hi') || safeId.includes('_hi') || safeTitle.includes('hindi') || safeTitle.includes('हिन्दी')) return 'hi';
-  if (safeLang.startsWith('ar') || safeId.includes('-ar') || safeId.includes('_ar') || safeTitle.includes('arabic') || safeTitle.includes('العربية')) return 'ar';
-  if (safeLang.startsWith('zh') || safeId.includes('-zh') || safeId.includes('_zh') || safeTitle.includes('chinese') || safeTitle.includes('中文')) return 'zh';
-  if (safeLang.startsWith('de') || safeId.includes('-de') || safeId.includes('_de') || safeTitle.includes('german') || safeTitle.includes('deutsch')) return 'de';
-  if (safeLang.startsWith('pt') || safeId.includes('-pt') || safeId.includes('_pt') || safeTitle.includes('portuguese') || safeTitle.includes('português')) return 'pt';
+  // 1. Priority 1: Explicit language definition on the item
+  if (safeLang) {
+    if (safeLang.startsWith('en')) return 'en';
+    if (safeLang.startsWith('fr')) return 'fr';
+    if (safeLang.startsWith('es')) return 'es';
+    if (safeLang.startsWith('hi')) return 'hi';
+    if (safeLang.startsWith('ar')) return 'ar';
+    if (safeLang.startsWith('zh')) return 'zh';
+    if (safeLang.startsWith('de')) return 'de';
+    if (safeLang.startsWith('pt')) return 'pt';
+  }
+
+  // 2. Priority 2: Kiwix standard ZIM ID language tags
+  if (safeId.includes('-en') || safeId.includes('_en') || safeId.startsWith('en.') || safeId.endsWith('.en')) return 'en';
+  if (safeId.includes('-fr') || safeId.includes('_fr') || safeId.startsWith('fr.') || safeId.endsWith('.fr')) return 'fr';
+  if (safeId.includes('-es') || safeId.includes('_es') || safeId.startsWith('es.') || safeId.endsWith('.es')) return 'es';
+  if (safeId.includes('-hi') || safeId.includes('_hi') || safeId.startsWith('hi.') || safeId.endsWith('.hi')) return 'hi';
+  if (safeId.includes('-ar') || safeId.includes('_ar') || safeId.startsWith('ar.') || safeId.endsWith('.ar')) return 'ar';
+  if (safeId.includes('-zh') || safeId.includes('_zh') || safeId.startsWith('zh.') || safeId.endsWith('.zh')) return 'zh';
+  if (safeId.includes('-de') || safeId.includes('_de') || safeId.startsWith('de.') || safeId.endsWith('.de')) return 'de';
+  if (safeId.includes('-pt') || safeId.includes('_pt') || safeId.startsWith('pt.') || safeId.endsWith('.pt')) return 'pt';
+
+  // 3. Priority 3: Title exact keyword matching with word boundaries
+  if (/\b(english)\b/i.test(safeTitle)) return 'en';
+  if (/\b(french|français)\b/i.test(safeTitle)) return 'fr';
+  if (/\b(spanish|español)\b/i.test(safeTitle)) return 'es';
+  if (/\b(hindi|हिन्दी)\b/i.test(safeTitle)) return 'hi';
+  if (/\b(arabic|العربية)\b/i.test(safeTitle)) return 'ar';
+  if (/\b(chinese|中文)\b/i.test(safeTitle)) return 'zh';
+  if (/\b(german|deutsch)\b/i.test(safeTitle)) return 'de';
+  if (/\b(portuguese|português)\b/i.test(safeTitle)) return 'pt';
 
   return 'en';
 }
@@ -170,7 +194,7 @@ export default function OfflineReaderModal({
     setSearchQuery('');
     const targetZimId = activePack.zimId || activePack.id || 'wikimed-en';
 
-    axios.get(`/api/offline/articles/${targetZimId}`)
+    axios.get(`/api/offline/articles/${targetZimId}?lang=${packLang}`)
       .then(res => {
         const list = res.data.articles || [];
         setArticles(list);

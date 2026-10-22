@@ -685,13 +685,17 @@ OFFLINE_ARTICLES_PT['wikipedia-pt-all'] = OFFLINE_ARTICLES_PT['default-pt'];
 
 /**
  * Universal language code detector
+ * Strictly maps files to their exact native language:
+ * English (en), French (fr), Spanish (es), Hindi (hi), Arabic (ar), Chinese (zh), German (de), Portuguese (pt)
  */
 function resolveLanguageCode(zimId = '', zimTitle = '', zimLanguage = '') {
   const safeLang = (zimLanguage || '').toLowerCase().trim();
   const safeId = (zimId || '').toLowerCase().trim();
   const safeTitle = (zimTitle || '').toLowerCase().trim();
 
+  // 1. Priority 1: Explicit language definition on the item
   if (safeLang) {
+    if (safeLang.startsWith('en')) return 'en';
     if (safeLang.startsWith('fr')) return 'fr';
     if (safeLang.startsWith('es')) return 'es';
     if (safeLang.startsWith('hi')) return 'hi';
@@ -699,17 +703,27 @@ function resolveLanguageCode(zimId = '', zimTitle = '', zimLanguage = '') {
     if (safeLang.startsWith('zh')) return 'zh';
     if (safeLang.startsWith('de')) return 'de';
     if (safeLang.startsWith('pt')) return 'pt';
-    if (safeLang.startsWith('en')) return 'en';
   }
 
-  // Detect from ID suffix or pattern (e.g. wikimed-es, wikipedia-hi-all, vikidia-fr)
-  if (safeId.includes('-fr') || safeId.includes('_fr') || safeId.startsWith('fr.') || safeTitle.includes('french') || safeTitle.includes('français')) return 'fr';
-  if (safeId.includes('-es') || safeId.includes('_es') || safeId.startsWith('es.') || safeTitle.includes('spanish') || safeTitle.includes('español')) return 'es';
-  if (safeId.includes('-hi') || safeId.includes('_hi') || safeId.startsWith('hi.') || safeTitle.includes('hindi') || safeTitle.includes('हिन्दी')) return 'hi';
-  if (safeId.includes('-ar') || safeId.includes('_ar') || safeId.startsWith('ar.') || safeTitle.includes('arabic') || safeTitle.includes('العربية')) return 'ar';
-  if (safeId.includes('-zh') || safeId.includes('_zh') || safeId.startsWith('zh.') || safeTitle.includes('chinese') || safeTitle.includes('中文')) return 'zh';
-  if (safeId.includes('-de') || safeId.includes('_de') || safeId.startsWith('de.') || safeTitle.includes('german') || safeTitle.includes('deutsch')) return 'de';
-  if (safeId.includes('-pt') || safeId.includes('_pt') || safeId.startsWith('pt.') || safeTitle.includes('portuguese') || safeTitle.includes('português')) return 'pt';
+  // 2. Priority 2: Kiwix standard ZIM ID language tags
+  if (safeId.includes('-en') || safeId.includes('_en') || safeId.startsWith('en.') || safeId.endsWith('.en')) return 'en';
+  if (safeId.includes('-fr') || safeId.includes('_fr') || safeId.startsWith('fr.') || safeId.endsWith('.fr')) return 'fr';
+  if (safeId.includes('-es') || safeId.includes('_es') || safeId.startsWith('es.') || safeId.endsWith('.es')) return 'es';
+  if (safeId.includes('-hi') || safeId.includes('_hi') || safeId.startsWith('hi.') || safeId.endsWith('.hi')) return 'hi';
+  if (safeId.includes('-ar') || safeId.includes('_ar') || safeId.startsWith('ar.') || safeId.endsWith('.ar')) return 'ar';
+  if (safeId.includes('-zh') || safeId.includes('_zh') || safeId.startsWith('zh.') || safeId.endsWith('.zh')) return 'zh';
+  if (safeId.includes('-de') || safeId.includes('_de') || safeId.startsWith('de.') || safeId.endsWith('.de')) return 'de';
+  if (safeId.includes('-pt') || safeId.includes('_pt') || safeId.startsWith('pt.') || safeId.endsWith('.pt')) return 'pt';
+
+  // 3. Priority 3: Title exact keyword matching with word boundaries
+  if (/\b(english)\b/i.test(safeTitle)) return 'en';
+  if (/\b(french|français)\b/i.test(safeTitle)) return 'fr';
+  if (/\b(spanish|español)\b/i.test(safeTitle)) return 'es';
+  if (/\b(hindi|हिन्दी)\b/i.test(safeTitle)) return 'hi';
+  if (/\b(arabic|العربية)\b/i.test(safeTitle)) return 'ar';
+  if (/\b(chinese|中文)\b/i.test(safeTitle)) return 'zh';
+  if (/\b(german|deutsch)\b/i.test(safeTitle)) return 'de';
+  if (/\b(portuguese|português)\b/i.test(safeTitle)) return 'pt';
 
   return 'en';
 }
@@ -770,6 +784,13 @@ function getOfflineArticlesForZim(zimId = '', zimTitle = '', zimCategory = '', z
       const matchKey = Object.keys(OFFLINE_ARTICLES_PT).find(k => safeId.startsWith(k) || k.startsWith(safeId));
       if (matchKey) return OFFLINE_ARTICLES_PT[matchKey];
       return OFFLINE_ARTICLES_PT['default-pt'];
+    }
+
+    case 'en': {
+      if (OFFLINE_ARTICLES_EN[safeId]) return OFFLINE_ARTICLES_EN[safeId];
+      const matchKey = Object.keys(OFFLINE_ARTICLES_EN).find(k => safeId.startsWith(k) || k.startsWith(safeId));
+      if (matchKey) return OFFLINE_ARTICLES_EN[matchKey];
+      return OFFLINE_ARTICLES_EN['default-en'];
     }
 
     default: {

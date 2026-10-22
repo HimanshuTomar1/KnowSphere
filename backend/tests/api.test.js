@@ -264,5 +264,15 @@ describe('KnowSphere Backend API & Security Suite', () => {
       const titles = res.body.articles.map(a => a.title).join(' ');
       expect(titles).toMatch(/Welcome to KnowSphere Offline Reader|Solar Water Disinfection/i);
     });
+
+    it('GET /api/offline/articles/:zimId?lang=en strictly returns English medical articles for WikiMed EN', async () => {
+      const res = await request(app).get('/api/offline/articles/wikimed-en?lang=en');
+      expect(res.status).toBe(200);
+      expect(res.body.language).toBe('en');
+      expect(res.body.articles.length).toBeGreaterThan(0);
+      const titles = res.body.articles.map(a => a.title).join(' ');
+      expect(titles).toMatch(/Cardiopulmonary Resuscitation|Burn Management/i);
+      expect(titles).not.toMatch(/Réanimation|Reanimación|कार्डियोपल्मोनरी/i);
+    });
   });
 });
