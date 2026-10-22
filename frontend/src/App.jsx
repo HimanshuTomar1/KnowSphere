@@ -125,23 +125,32 @@ export default function App() {
   // Detect when first resource becomes ready in THIS onboarding session
   useEffect(() => {
     if (!firstResourceTime && Array.isArray(state.downloads) && state.downloads.length > 0) {
-      const newlyDone = state.downloads.find(d => {
-        if (d.status !== 'completed') return false;
-        const started = d.startedAt || d.sessionStartedAt;
-        return started && started >= startTime;
-      });
-
-      if (newlyDone) {
+      const completedPack = state.downloads.find(d => d.status === 'completed');
+      if (completedPack) {
         const now = Date.now();
         setFirstResourceTime(now);
         const elapsed = Math.max(1, Math.round((now - startTime) / 1000));
         setTelemetry(prev => ({
           ...prev,
-          actualTtfrSec: elapsed,
+          actualTtfrSec: prev.actualTtfrSec || elapsed,
         }));
       }
     }
   }, [state.downloads, firstResourceTime, startTime]);
+
+  // When setup is complete (reached Step 7: Ready / CompleteStep), stop TTFR immediately if not already stopped
+  useEffect(() => {
+    const isSetupComplete = (state.stepIndex >= 6) || (STEPS[state.stepIndex]?.id === 'complete');
+    if (isSetupComplete && !firstResourceTime) {
+      const now = Date.now();
+      setFirstResourceTime(now);
+      const elapsed = Math.max(1, Math.round((now - startTime) / 1000));
+      setTelemetry(prev => ({
+        ...prev,
+        actualTtfrSec: prev.actualTtfrSec || elapsed,
+      }));
+    }
+  }, [state.stepIndex, firstResourceTime, startTime]);
 
   // User auth state with local storage fallback
   const [user, setUser] = useState(() => {
@@ -249,7 +258,7 @@ export default function App() {
 
   const ttfrSeconds = firstResourceTime
     ? Math.round((firstResourceTime - startTime) / 1000)
-    : Math.round((Date.now() - startTime) / 1000);
+    : (telemetry?.actualTtfrSec || Math.round((Date.now() - startTime) / 1000));
 
   // Dynamic calculation of storage consumption across selection and active downloads
   const selectedPacksBytes = (state.selectedZims || []).reduce((acc, id) => {

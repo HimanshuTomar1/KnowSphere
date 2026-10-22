@@ -3,205 +3,77 @@ import axios from 'axios';
 import KnowSphereLogo from './KnowSphereLogo';
 
 /**
- * Multilingual UI translations for Offline Reader across all 8 supported languages:
- * English (en), French (fr), Spanish (es), Hindi (hi), Arabic (ar), Chinese (zh), German (de), Portuguese (pt)
+ * Native language indicator metadata for downloaded files.
+ * The application chrome remains in standard English, while the file's
+ * articles, topics, and content are displayed strictly in that file's native language.
  */
-const I18N = {
-  en: {
-    readerTitle: 'KnowSphere Offline Reader',
-    offlineBadge: '● 100% OFFLINE',
-    zeroInternet: count => `Zero Internet Required · ${count} Downloaded Pack${count !== 1 ? 's' : ''} Ready`,
-    shelfTitle: count => `📚 Downloaded Files in Your Offline Library (${count}):`,
-    shelfSub: 'Showing only completed local files',
-    emptyShelf: 'No completed downloads yet. Download files in Step 6 to read them offline.',
-    searchPlaceholder: title => `🔍 Search in ${title}…`,
-    verifiedArchive: 'Verified Local ZIM Archive',
-    cachedBadge: '✅ Cached',
-    openBadge: '✓ Open',
-    offlineStatus: 'Offline',
-    openingIndex: 'Opening offline index…',
-    noArticles: 'No matching offline articles found.',
-    articlesIndexed: count => `📦 ${count} articles indexed`,
-    localBadge: '✓ Local',
-    verifiedNotice: (filename) => `Verified Offline Reading: Loaded from physical local manifest ${filename} with zero network requests. You can browse completely off-grid.`,
-    selectPrompt: 'Select an article from the left to read.',
-    cachedOffline: 'Cached Offline',
-    articleFallbackCategory: 'Offline Reference',
-    articleFallbackSnippet: 'Full content downloaded and cached offline on this device.',
-    articleFallbackIntro: title => `Introduction to ${title}`,
-    articleFallbackBody: title => `<p>This knowledge pack is fully downloaded and verified on your device. You can search, browse, and read all articles without internet access.</p>`
-  },
+const NATIVE_LANG_INFO = {
+  fr: { code: 'fr', flag: '🇫🇷', name: 'Français (Native File)', dir: 'ltr' },
+  es: { code: 'es', flag: '🇪🇸', name: 'Español (Native File)', dir: 'ltr' },
+  hi: { code: 'hi', flag: '🇮🇳', name: 'हिन्दी (Native File)', dir: 'ltr' },
+  ar: { code: 'ar', flag: '🇸🇦', name: 'العربية (Native File)', dir: 'rtl' },
+  zh: { code: 'zh', flag: '🇨🇳', name: '中文 (Native File)', dir: 'ltr' },
+  de: { code: 'de', flag: '🇩🇪', name: 'Deutsch (Native File)', dir: 'ltr' },
+  pt: { code: 'pt', flag: '🇧🇷', name: 'Português (Native File)', dir: 'ltr' },
+  en: { code: 'en', flag: '🇬🇧', name: 'English (Native File)', dir: 'ltr' },
+};
+
+/**
+ * Localized offline fallback content tailored to the file's native language
+ * (used only if local backend service cannot be reached).
+ */
+const FALLBACK_NATIVE_ARTICLES = {
   fr: {
-    readerTitle: 'Lecteur Hors-Ligne KnowSphere',
-    offlineBadge: '● 100% HORS-LIGNE',
-    zeroInternet: count => `Zéro Internet Requis · ${count} Fichier${count > 1 ? 's' : ''} Prêt${count > 1 ? 's' : ''}`,
-    shelfTitle: count => `📚 Archives Téléchargées dans Votre Bibliothèque (${count}) :`,
-    shelfSub: 'Archives locales vérifiées',
-    emptyShelf: 'Aucun téléchargement terminé. Téléchargez des fichiers à l\'étape 6 pour les lire hors-ligne.',
-    searchPlaceholder: title => `🔍 Rechercher dans ${title}…`,
-    verifiedArchive: 'Archive ZIM Locale Vérifiée',
-    cachedBadge: '✅ En Cache',
-    openBadge: '✓ Ouvert',
-    offlineStatus: 'Hors-Ligne',
-    openingIndex: 'Ouverture de l’index hors-ligne…',
-    noArticles: 'Aucun article correspondant trouvé.',
-    articlesIndexed: count => `📦 ${count} article${count > 1 ? 's' : ''} indexé${count > 1 ? 's' : ''}`,
-    localBadge: '✓ Local',
-    verifiedNotice: (filename) => `Lecture Hors-Ligne Vérifiée : Contenu extrait directement du manifeste local ${filename} sans aucune requête réseau externe. Navigation intégrale en mode avion.`,
-    selectPrompt: 'Sélectionnez un article dans la liste à gauche pour commencer votre lecture.',
-    cachedOffline: 'Mis en cache hors-ligne',
-    articleFallbackCategory: 'Référence Hors-Ligne',
-    articleFallbackSnippet: 'Contenu intégral disponible hors-ligne sur votre appareil.',
-    articleFallbackIntro: title => `Introduction à ${title}`,
-    articleFallbackBody: title => `<p>Ce module d'apprentissage est entièrement disponible en <b>langue française</b> et stocké directement sur votre équipement. Vous pouvez parcourir, étudier et approfondir tous les chapitres sans aucun besoin de connexion internet.</p>`
+    category: 'Référence Hors-Ligne',
+    snippet: 'Contenu intégral disponible hors-ligne sur votre appareil.',
+    intro: title => `Introduction à ${title}`,
+    body: title => `<p>Ce module d'apprentissage est entièrement disponible en <b>langue française</b> et stocké directement sur votre équipement. Vous pouvez parcourir, étudier et approfondir tous les chapitres sans aucun besoin de connexion internet.</p>`
   },
   es: {
-    readerTitle: 'Lector Fuera de Línea KnowSphere',
-    offlineBadge: '● 100% FUERA DE LÍNEA',
-    zeroInternet: count => `Cero Internet Requerido · ${count} Archivo${count !== 1 ? 's' : ''} Listo${count !== 1 ? 's' : ''}`,
-    shelfTitle: count => `📚 Archivos Descargados en tu Biblioteca (${count}):`,
-    shelfSub: 'Mostrando solo archivos locales completos',
-    emptyShelf: 'Aún no hay descargas completas. Descarga archivos en el Paso 6 para leerlos fuera de línea.',
-    searchPlaceholder: title => `🔍 Buscar en ${title}…`,
-    verifiedArchive: 'Archivo ZIM Local Verificado',
-    cachedBadge: '✅ En Caché',
-    openBadge: '✓ Abierto',
-    offlineStatus: 'Fuera de Línea',
-    openingIndex: 'Abriendo índice fuera de línea…',
-    noArticles: 'No se encontraron artículos coincidentes.',
-    articlesIndexed: count => `📦 ${count} artículos indexados`,
-    localBadge: '✓ Local',
-    verifiedNotice: (filename) => `Lectura Fuera de Línea Verificada: Cargado directamente desde el manifiesto local ${filename} sin peticiones de red. Navegación completa en modo avión.`,
-    selectPrompt: 'Selecciona un artículo de la izquierda para comenzar a leer.',
-    cachedOffline: 'Guardado fuera de línea',
-    articleFallbackCategory: 'Referencia Fuera de Línea',
-    articleFallbackSnippet: 'Contenido completo descargado y en caché local en este dispositivo.',
-    articleFallbackIntro: title => `Introducción a ${title}`,
-    articleFallbackBody: title => `<p>Este módulo de aprendizaje está completamente disponible en <b>idioma español</b> y guardado en tu dispositivo. Puedes consultar artículos sin conexión a internet.</p>`
+    category: 'Referencia Fuera de Línea',
+    snippet: 'Contenido completo descargado y en caché local en este dispositivo.',
+    intro: title => `Introducción a ${title}`,
+    body: title => `<p>Este módulo de aprendizaje está completamente disponible en <b>idioma español</b> y guardado en tu dispositivo. Puedes consultar artículos sin conexión a internet.</p>`
   },
   hi: {
-    readerTitle: 'नोस्फ़ेयर ऑफ़लाइन रीडर',
-    offlineBadge: '● 100% ऑफ़लाइन',
-    zeroInternet: count => `इंटरनेट की कोई आवश्यकता नहीं · ${count} पैकेज तैयार`,
-    shelfTitle: count => `📚 आपकी ऑफ़लाइन लाइब्रेरी में सहेजे गए पैकेज (${count}):`,
-    shelfSub: 'केवल पूर्ण स्थानीय फ़ाइलें प्रदर्शित',
-    emptyShelf: 'अभी तक कोई डाउनलोड पूर्ण नहीं हुआ। ऑफ़लाइन पढ़ने के लिए चरण 6 में पैकेज डाउनलोड करें।',
-    searchPlaceholder: title => `🔍 ${title} में खोजें…`,
-    verifiedArchive: 'सत्यापित स्थानीय ZIM संग्रह',
-    cachedBadge: '✅ कैश्ड',
-    openBadge: '✓ खुला है',
-    offlineStatus: 'ऑफ़लाइन',
-    openingIndex: 'ऑफ़लाइन अनुक्रमणिका लोड हो रही है…',
-    noArticles: 'कोई मेल खाता लेख नहीं मिला।',
-    articlesIndexed: count => `📦 ${count} लेख अनुक्रमित`,
-    localBadge: '✓ स्थानीय',
-    verifiedNotice: (filename) => `सत्यापित ऑफ़लाइन पठन: बिना किसी नेटवर्क अनुरोध के स्थानीय फ़ाइल ${filename} से लोड किया गया। आप पूरी तरह हवाई जहाज़ मोड में पढ़ सकते हैं।`,
-    selectPrompt: 'पढ़ने के लिए बाईं ओर सूची से कोई लेख चुनें।',
-    cachedOffline: 'ऑफ़लाइन सहेजा गया',
-    articleFallbackCategory: 'ऑफ़लाइन संदर्भ',
-    articleFallbackSnippet: 'इस डिवाइस पर संपूर्ण सामग्री ऑफ़लाइन उपलब्ध है।',
-    articleFallbackIntro: title => `${title} का परिचय`,
-    articleFallbackBody: title => `<p>यह संपूर्ण ज्ञानकोश आपकी स्थानीय डिवाइस पर <b>हिन्दी भाषा</b> में सुरक्षित है। आप बिना किसी इंटरनेट के सभी लेख और अध्याय पढ़ सकते हैं।</p>`
+    category: 'ऑफ़लाइन संदर्भ',
+    snippet: 'इस डिवाइस पर संपूर्ण सामग्री ऑफ़लाइन उपलब्ध है।',
+    intro: title => `${title} का परिचय`,
+    body: title => `<p>यह संपूर्ण ज्ञानकोश आपकी स्थानीय डिवाइस पर <b>हिन्दी भाषा</b> में सुरक्षित है। आप बिना किसी इंटरनेट के सभी लेख और अध्याय पढ़ सकते हैं।</p>`
   },
   ar: {
-    readerTitle: 'قارئ نوسفير بدون إنترنت',
-    offlineBadge: '● 100% بدون إنترنت',
-    zeroInternet: count => `لا يلزم اتصال بالإنترنت · ${count} حزم جاهزة`,
-    shelfTitle: count => `📚 الملفات المحفوظة في مكتبتك (${count}):`,
-    shelfSub: 'عرض الملفات المحلية المكتملة فقط',
-    emptyShelf: 'لا توجد تنزيلات مكتملة حتى الآن. قم بتنزيل الملفات في الخطوة 6 لقراءتها بدون إنترنت.',
-    searchPlaceholder: title => `🔍 ابحث في ${title}…`,
-    verifiedArchive: 'أرشيف ZIM محلي موثوق',
-    cachedBadge: '✅ محفوظ',
-    openBadge: '✓ مفتوح',
-    offlineStatus: 'محلي',
-    openingIndex: 'جارٍ فتح الفهرس بدون إنترنت…',
-    noArticles: 'لم يتم العثور على مقالات مطابقة.',
-    articlesIndexed: count => `📦 ${count} مقالات مفهرسة`,
-    localBadge: '✓ محلي',
-    verifiedNotice: (filename) => `قراءة بدون إنترنت تم التحقق منها: محملة من الملف المحلي ${filename} دون استهلاك أي بيانات.`,
-    selectPrompt: 'اختر مقالاً من القائمة الجانبية لبدء القراءة.',
-    cachedOffline: 'محفوظ محلياً',
-    articleFallbackCategory: 'مرجع بدون إنترنت',
-    articleFallbackSnippet: 'المحتوى الكامل متاح محلياً على هذا الجهاز.',
-    articleFallbackIntro: title => `مقدمة إلى ${title}`,
-    articleFallbackBody: title => `<p>هذه الحزمة المعرفية محملة بالكامل باللغة <b>العربية</b> ومحفوظة على جهازك لتصفحها في أي وقت دون إنترنت.</p>`
+    category: 'مرجع بدون إنترنت',
+    snippet: 'المحتوى الكامل متاح محلياً على هذا الجهاز.',
+    intro: title => `مقدمة إلى ${title}`,
+    body: title => `<p>هذه الحزمة المعرفية محملة بالكامل باللغة <b>العربية</b> ومحفوظة على جهازك لتصفحها في أي وقت دون إنترنت.</p>`
   },
   zh: {
-    readerTitle: 'KnowSphere 离线阅读器',
-    offlineBadge: '● 100% 完全离线',
-    zeroInternet: count => `零网络流量消耗 · ${count} 个本地资源包就绪`,
-    shelfTitle: count => `📚 本地离线知识库 (${count}):`,
-    shelfSub: '仅显示已完成下载的本地知识文件',
-    emptyShelf: '暂无已完成的下载。请在第 6 步下载文件以离线畅读。',
-    searchPlaceholder: title => `🔍 在 ${title} 中检索…`,
-    verifiedArchive: '本地已验证 ZIM 归档',
-    cachedBadge: '✅ 已缓存',
-    openBadge: '✓ 已打开',
-    offlineStatus: '完全离线',
-    openingIndex: '正在打开本地离线索引…',
-    noArticles: '未检索到匹配的词条。',
-    articlesIndexed: count => `📦 已索引 ${count} 个词条`,
-    localBadge: '✓ 本地',
-    verifiedNotice: (filename) => `已验证离线阅读：直接从本地持久化文件 ${filename} 读取，零网络请求，飞行模式畅享。`,
-    selectPrompt: '请在左侧列表中点击词条开始阅读。',
-    cachedOffline: '离线已缓存',
-    articleFallbackCategory: '离线参考',
-    articleFallbackSnippet: '完整知识内容已缓存在此设备本地。',
-    articleFallbackIntro: title => `${title} 简介`,
-    articleFallbackBody: title => `<p>此知识归档已完整保存在您的设备本地，支持<b>简体中文</b>深度离线阅读，无需任何网络环境。</p>`
+    category: '离线参考',
+    snippet: '完整知识内容已缓存在此设备本地。',
+    intro: title => `${title} 简介`,
+    body: title => `<p>此知识归档已完整保存在您的设备本地，支持<b>简体中文</b>深度离线阅读，无需任何网络环境。</p>`
   },
   de: {
-    readerTitle: 'KnowSphere Offline-Reader',
-    offlineBadge: '● 100% OFFLINE',
-    zeroInternet: count => `Kein Internet erforderlich · ${count} Paket${count !== 1 ? 'e' : ''} bereit`,
-    shelfTitle: count => `📚 Heruntergeladene Pakete in Ihrer Offline-Bibliothek (${count}):`,
-    shelfSub: 'Nur verifizierte lokale Dateien werden angezeigt',
-    emptyShelf: 'Noch keine abgeschlossenen Downloads. Laden Sie Pakete in Schritt 6 herunter.',
-    searchPlaceholder: title => `🔍 In ${title} suchen…`,
-    verifiedArchive: 'Verifiziertes lokales ZIM-Archiv',
-    cachedBadge: '✅ Gespeichert',
-    openBadge: '✓ Geöffnet',
-    offlineStatus: 'Offline',
-    openingIndex: 'Offline-Index wird geladen…',
-    noArticles: 'Keine passenden Artikel gefunden.',
-    articlesIndexed: count => `📦 ${count} Artikel indexiert`,
-    localBadge: '✓ Lokal',
-    verifiedNotice: (filename) => `Verifiziertes Offline-Lesen: Direkt aus der lokalen Datei ${filename} ohne Netzanfragen geladen.`,
-    selectPrompt: 'Wählen Sie links einen Artikel aus, um mit dem Lesen zu beginnen.',
-    cachedOffline: 'Lokal gespeichert',
-    articleFallbackCategory: 'Offline-Referenz',
-    articleFallbackSnippet: 'Vollständiger Inhalt auf diesem Gerät offline verfügbar.',
-    articleFallbackIntro: title => `Einführung in ${title}`,
-    articleFallbackBody: title => `<p>Dieses Lernmodul steht vollständig in <b>deutscher Sprache</b> offline auf Ihrem Gerät zur Verfügung.</p>`
+    category: 'Offline-Referenz',
+    snippet: 'Vollständiger Inhalt auf diesem Gerät offline verfügbar.',
+    intro: title => `Einführung in ${title}`,
+    body: title => `<p>Dieses Lernmodul steht vollständig in <b>deutscher Sprache</b> offline auf Ihrem Gerät zur Verfügung.</p>`
   },
   pt: {
-    readerTitle: 'Leitor Offline KnowSphere',
-    offlineBadge: '● 100% OFFLINE',
-    zeroInternet: count => `Zero Internet Necessária · ${count} Pacote${count !== 1 ? 's' : ''} Pronto${count !== 1 ? 's' : ''}`,
-    shelfTitle: count => `📚 Arquivos Baixados na sua Biblioteca Offline (${count}):`,
-    shelfSub: 'Exibindo apenas arquivos locais completos',
-    emptyShelf: 'Nenhum download concluído ainda. Baixe arquivos no Passo 6 para leitura offline.',
-    searchPlaceholder: title => `🔍 Pesquisar em ${title}…`,
-    verifiedArchive: 'Arquivo ZIM Local Verificado',
-    cachedBadge: '✅ Em Cache',
-    openBadge: '✓ Aberto',
-    offlineStatus: 'Offline',
-    openingIndex: 'Abrindo índice offline…',
-    noArticles: 'Nenhum artigo correspondente encontrado.',
-    articlesIndexed: count => `📦 ${count} artigos indexados`,
-    localBadge: '✓ Local',
-    verifiedNotice: (filename) => `Leitura Offline Verificada: Carregado do arquivo local ${filename} com zero requisições de rede.`,
-    selectPrompt: 'Selecione um artigo à esquerda para começar a leitura.',
-    cachedOffline: 'Em cache offline',
-    articleFallbackCategory: 'Referência Offline',
-    articleFallbackSnippet: 'Conteúdo completo baixado e salvo neste dispositivo.',
-    articleFallbackIntro: title => `Introdução a ${title}`,
-    articleFallbackBody: title => `<p>Este módulo de conhecimento está totalmente disponível em <b>língua portuguesa</b> diretamente no seu dispositivo sem precisar de internet.</p>`
+    category: 'Referência Offline',
+    snippet: 'Conteúdo completo baixado e salvo neste dispositivo.',
+    intro: title => `Introdução a ${title}`,
+    body: title => `<p>Este módulo de conhecimento está totalmente disponível em <b>língua portuguesa</b> diretamente no seu dispositivo sem precisar de internet.</p>`
+  },
+  en: {
+    category: 'Offline Reference',
+    snippet: 'Full content downloaded and cached offline on this device.',
+    intro: title => `Introduction to ${title}`,
+    body: title => `<p>This knowledge pack is fully downloaded and verified on your device. You can search, browse, and read all articles without internet access.</p>`
   }
 };
 
-function resolvePackLang(pack) {
+export function resolvePackLang(pack) {
   if (!pack) return 'en';
   const safeLang = (pack.language || '').toLowerCase().trim();
   const safeId = (pack.zimId || pack.id || '').toLowerCase().trim();
@@ -219,9 +91,10 @@ function resolvePackLang(pack) {
 }
 
 /**
- * OfflineReaderModal — Universal Multilingual Offline Knowledge Reader
- * Strictly displays and navigates ONLY files that have been downloaded (status === 'completed').
- * Fully localizes all content and reader UI into the package's native language.
+ * OfflineReaderModal — Offline Knowledge Reader
+ * - Displays and navigates ONLY files that have been downloaded (status === 'completed').
+ * - Modal UI chrome is maintained in standard English for consistent usability.
+ * - Downloaded files serve 100% native language content (French files in French, Spanish in Spanish, Hindi in Hindi, etc.).
  */
 export default function OfflineReaderModal({
   isOpen,
@@ -285,9 +158,9 @@ export default function OfflineReaderModal({
     prevIsOpenRef.current = true;
   }, [isOpen, zimPack, downloadedFiles, activePack]);
 
-  // Current package language & translations
-  const currentLang = useMemo(() => resolvePackLang(activePack), [activePack]);
-  const t = useMemo(() => I18N[currentLang] || I18N.en, [currentLang]);
+  // Current package native language
+  const packLang = useMemo(() => resolvePackLang(activePack), [activePack]);
+  const langMeta = useMemo(() => NATIVE_LANG_INFO[packLang] || NATIVE_LANG_INFO.en, [packLang]);
 
   // ── 3. Fetch offline articles dynamically for the selected pack ───
   useEffect(() => {
@@ -308,23 +181,24 @@ export default function OfflineReaderModal({
         }
       })
       .catch(() => {
-        // Safe localized offline fallback
+        // Safe native offline fallback matching the file's language
+        const fallbackConfig = FALLBACK_NATIVE_ARTICLES[packLang] || FALLBACK_NATIVE_ARTICLES.en;
         const fallback = [
           {
-            title: t.articleFallbackIntro(activePack.title || 'Archive'),
-            category: t.articleFallbackCategory,
-            snippet: t.articleFallbackSnippet,
+            title: fallbackConfig.intro(activePack.title || 'Archive'),
+            category: fallbackConfig.category,
+            snippet: fallbackConfig.snippet,
             content: `<h2>${activePack.title || 'Archive'}</h2>
-            ${t.articleFallbackBody(activePack.title || 'Archive')}
-            <h3>${t.verifiedArchive}</h3>
-            <p>${t.verifiedNotice(`${activePack.zimId || 'archive'}.zim`)}</p>`
+            ${fallbackConfig.body(activePack.title || 'Archive')}
+            <h3>Verified Local ZIM Archive</h3>
+            <p>Verified Offline Reading: Loaded from physical local manifest <code>${activePack.zimId || 'archive'}.zim</code> with zero network requests.</p>`
           }
         ];
         setArticles(fallback);
         setSelectedArticle(fallback[0]);
       })
       .finally(() => setLoading(false));
-  }, [isOpen, activePack, currentLang, t]);
+  }, [isOpen, activePack, packLang]);
 
   if (!isOpen) return null;
 
@@ -345,7 +219,7 @@ export default function OfflineReaderModal({
   const packShortTitle = activePack?.title ? activePack.title.split(' ')[0] : 'pack';
 
   return (
-    <div className="auth-overlay" onClick={onClose} dir={currentLang === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="auth-overlay" onClick={onClose} dir="ltr">
       <div
         className="auth-modal"
         style={{
@@ -363,7 +237,7 @@ export default function OfflineReaderModal({
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* ── Top Header ───────────────────────────────────────────── */}
+        {/* ── Top Header (Consistent UI Chrome in English) ─────────── */}
         <div style={{
           padding: '14px 20px',
           background: 'rgba(255, 255, 255, 0.92)',
@@ -379,16 +253,16 @@ export default function OfflineReaderModal({
             <KnowSphereLogo size={28} color="#ffffff" />
             <div>
               <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 700 }}>
-                {t.readerTitle}
+                KnowSphere Offline Reader
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--k-slate-400)', marginTop: 2 }}>
                 <span style={{
                   background: '#10B981', color: '#fff', padding: '1px 7px', borderRadius: 99,
                   fontWeight: 700, fontSize: 10, letterSpacing: 0.2
                 }}>
-                  {t.offlineBadge}
+                  ● 100% OFFLINE
                 </span>
-                <span>{t.zeroInternet(downloadedFiles.length)}</span>
+                <span>Zero Internet Required · {downloadedFiles.length} Downloaded Pack{downloadedFiles.length !== 1 ? 's' : ''} Ready</span>
               </div>
             </div>
           </div>
@@ -425,10 +299,10 @@ export default function OfflineReaderModal({
               letterSpacing: 0.5,
               textTransform: 'uppercase'
             }}>
-              {t.shelfTitle(downloadedFiles.length)}
+              📚 Downloaded Files in Your Offline Library ({downloadedFiles.length}):
             </div>
             <div style={{ fontSize: 10, color: '#0071E3', fontWeight: 700 }}>
-              {t.shelfSub}
+              Showing only completed local files
             </div>
           </div>
 
@@ -442,7 +316,7 @@ export default function OfflineReaderModal({
           }}>
             {downloadedFiles.length === 0 ? (
               <div style={{ fontSize: 12, color: '#6E6E73', padding: '4px 0' }}>
-                {t.emptyShelf}
+                No completed downloads yet. Download files in Step 6 to read them offline.
               </div>
             ) : (
               downloadedFiles.map(dl => {
@@ -451,6 +325,8 @@ export default function OfflineReaderModal({
                   (activePack.zimId && activePack.zimId === dl.zimId) ||
                   activePack.id === dl.id
                 );
+                const fileLang = resolvePackLang(dl);
+                const flag = NATIVE_LANG_INFO[fileLang]?.flag || '🌍';
 
                 return (
                   <button
@@ -474,7 +350,7 @@ export default function OfflineReaderModal({
                     }}
                     title={`Switch reader to ${dl.title}`}
                   >
-                    <span style={{ fontSize: 14 }}>{dl.icon || '📦'}</span>
+                    <span style={{ fontSize: 14 }}>{dl.icon || flag || '📦'}</span>
                     <span>{dl.title}</span>
                     <span style={{
                       fontSize: 10,
@@ -484,11 +360,11 @@ export default function OfflineReaderModal({
                       background: isActive ? 'rgba(255,255,255,0.22)' : '#F2F2F7',
                       color: isActive ? '#FFFFFF' : '#6E6E73',
                     }}>
-                      {dl.totalFormatted || t.offlineStatus}
+                      {dl.totalFormatted || 'Offline'}
                     </span>
                     {isActive && (
                       <span style={{ color: '#FFFFFF', fontSize: 11, fontWeight: 900 }}>
-                        {t.openBadge}
+                        ✓ Open
                       </span>
                     )}
                   </button>
@@ -502,15 +378,14 @@ export default function OfflineReaderModal({
         <div style={{ display: 'flex', flex: 1, minHeight: 0, background: '#F8FAFC' }}>
           {/* Article List / Table of Contents */}
           <div style={{
-            width: 300,
-            borderRight: currentLang === 'ar' ? 'none' : '1.5px solid var(--k-border)',
-            borderLeft: currentLang === 'ar' ? '1.5px solid var(--k-border)' : 'none',
+            width: 320,
+            borderRight: '1.5px solid var(--k-border)',
             display: 'flex',
             flexDirection: 'column',
             background: '#fff',
             flexShrink: 0
           }}>
-            {/* Active Pack Info Card */}
+            {/* Active Pack Info Card with Native Language Pill */}
             {activePack && (
               <div style={{
                 padding: '10px 14px',
@@ -532,8 +407,17 @@ export default function OfflineReaderModal({
                   }}>
                     {activePack.title}
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--k-text3)', marginTop: 1 }}>
-                    {activePack.totalFormatted} · {t.verifiedArchive}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: '#0369A1',
+                      background: '#E0F2FE',
+                      padding: '1px 6px',
+                      borderRadius: 4
+                    }}>
+                      {langMeta.flag} {langMeta.name}
+                    </span>
                   </div>
                 </div>
                 <span style={{
@@ -545,7 +429,7 @@ export default function OfflineReaderModal({
                   borderRadius: 6,
                   flexShrink: 0
                 }}>
-                  {t.cachedBadge}
+                  ✅ Cached
                 </span>
               </div>
             )}
@@ -556,22 +440,22 @@ export default function OfflineReaderModal({
                 type="text"
                 className="field-input"
                 style={{ padding: '7px 12px', fontSize: 12, background: 'var(--k-bg)' }}
-                placeholder={t.searchPlaceholder(packShortTitle)}
+                placeholder={`🔍 Search in ${packShortTitle}…`}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
             </div>
 
-            {/* Articles List */}
+            {/* Articles List in File's Native Language */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
               {loading ? (
                 <div className="loader" style={{ padding: 28 }}>
                   <div className="spinner" />
-                  <span style={{ fontSize: 12 }}>{t.openingIndex}</span>
+                  <span style={{ fontSize: 12 }}>Opening offline index…</span>
                 </div>
               ) : filteredArticles.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 28, fontSize: 12, color: 'var(--k-text3)' }}>
-                  {t.noArticles}
+                  No matching offline articles found.
                 </div>
               ) : (
                 filteredArticles.map((art, idx) => {
@@ -617,15 +501,18 @@ export default function OfflineReaderModal({
               alignItems: 'center',
               justifyContent: 'space-between'
             }}>
-              <span>{t.articlesIndexed(articles.length)}</span>
-              <span style={{ color: '#16A34A', fontWeight: 800 }}>{t.localBadge}</span>
+              <span>📦 {articles.length} articles indexed</span>
+              <span style={{ color: '#16A34A', fontWeight: 800 }}>✓ Local</span>
             </div>
           </div>
 
-          {/* Article Reader Pane */}
+          {/* Article Reader Pane — Renders strictly in File's Native Language */}
           <div style={{ flex: 1, padding: '24px 36px', overflowY: 'auto', background: '#fff' }}>
             {selectedArticle ? (
-              <div style={{ maxWidth: 660, margin: '0 auto' }}>
+              <div
+                style={{ maxWidth: 660, margin: '0 auto' }}
+                dir={langMeta.dir}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                   <span style={{
                     fontSize: 11, fontWeight: 800, background: 'var(--k-bg2)',
@@ -634,7 +521,13 @@ export default function OfflineReaderModal({
                     {selectedArticle.category || 'Article'}
                   </span>
                   <span style={{ fontSize: 11, color: 'var(--k-text3)' }}>
-                    {activePack?.title} · {t.cachedOffline}
+                    {activePack?.title} · Cached Offline
+                  </span>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: '#15803D',
+                    background: '#DCFCE7', padding: '1px 6px', borderRadius: 4
+                  }}>
+                    {langMeta.flag} {langMeta.name}
                   </span>
                 </div>
 
@@ -661,25 +554,28 @@ export default function OfflineReaderModal({
                   dangerouslySetInnerHTML={{ __html: selectedArticle.content }}
                 />
 
-                <div style={{
-                  marginTop: 32,
-                  padding: 14,
-                  borderRadius: 12,
-                  background: 'var(--k-green-light)',
-                  border: '1.5px solid #A5D6A7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12
-                }}>
+                <div
+                  style={{
+                    marginTop: 32,
+                    padding: 14,
+                    borderRadius: 12,
+                    background: 'var(--k-green-light)',
+                    border: '1.5px solid #A5D6A7',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12
+                  }}
+                  dir="ltr"
+                >
                   <span style={{ fontSize: 22 }}>✅</span>
                   <div style={{ fontSize: 12, color: '#1B5E20', lineHeight: 1.4 }}>
-                    <strong>{t.verifiedArchive}</strong>: {t.verifiedNotice(`<code>${activePack?.zimId || 'pack'}.zim</code>`)}
+                    <strong>Verified Local ZIM Archive</strong>: Loaded from physical local manifest <code>{activePack?.zimId || 'pack'}.zim</code> with zero network requests. You can browse completely off-grid.
                   </div>
                 </div>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: 60, color: 'var(--k-text3)' }}>
-                {t.selectPrompt}
+                Select an article from the left to read.
               </div>
             )}
           </div>

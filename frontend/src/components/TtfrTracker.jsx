@@ -10,6 +10,8 @@ export default function TtfrTracker({
   stepIndex,
   onOpenDetails
 }) {
+  const isCompleted = !!firstResourceTime || (typeof stepIndex === 'number' && stepIndex >= 6);
+
   const [elapsedSeconds, setElapsedSeconds] = useState(() => {
     if (firstResourceTime && startTime) {
       return Math.max(1, Math.round((firstResourceTime - startTime) / 1000));
@@ -19,13 +21,14 @@ export default function TtfrTracker({
   });
 
   useEffect(() => {
-    if (firstResourceTime && startTime) {
-      setElapsedSeconds(Math.max(1, Math.round((firstResourceTime - startTime) / 1000)));
-      return;
+    if (isCompleted && startTime) {
+      if (firstResourceTime) {
+        setElapsedSeconds(Math.max(1, Math.round((firstResourceTime - startTime) / 1000)));
+      }
+      return; // Permanently stop the live timer when setup is complete or first resource ready
     }
 
     const origin = startTime || Date.now();
-    // Update immediately
     setElapsedSeconds(Math.max(0, Math.round((Date.now() - origin) / 1000)));
 
     const interval = setInterval(() => {
@@ -33,7 +36,7 @@ export default function TtfrTracker({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startTime, firstResourceTime]);
+  }, [startTime, firstResourceTime, isCompleted]);
 
   const formatTime = secs => {
     const m = Math.floor(secs / 60);
@@ -41,9 +44,7 @@ export default function TtfrTracker({
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  const isCompleted = !!firstResourceTime;
   const targetSeconds = 120; // 2 minutes benchmark target
-  const isAheadOfTarget = elapsedSeconds <= targetSeconds;
 
   return (
     <div
@@ -62,7 +63,9 @@ export default function TtfrTracker({
         transition: 'all 0.2s ease',
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
       }}
-      title="Time-to-First-Resource (TTFR) Live Stopwatch. Click to open usability benchmarks."
+      title={isCompleted
+        ? "Time-to-First-Resource (TTFR) Achieved: Stopped upon setup completion. Click to view usability benchmarks."
+        : "Time-to-First-Resource (TTFR) Live Stopwatch. Click to open usability benchmarks."}
     >
       {!isCompleted ? (
         <span style={{
