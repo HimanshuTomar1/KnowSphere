@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 /**
- * TtfrTracker — Time-to-First-Resource live benchmark tracker
+ * TtfrTracker — Time-to-First-Resource live dynamic benchmark tracker
  * Measures user elapsed time from onboarding launch until the first knowledge pack is completed and ready to read.
  */
 export default function TtfrTracker({
@@ -10,17 +10,26 @@ export default function TtfrTracker({
   stepIndex,
   onOpenDetails
 }) {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(() => {
+    if (firstResourceTime && startTime) {
+      return Math.max(1, Math.round((firstResourceTime - startTime) / 1000));
+    }
+    const origin = startTime || Date.now();
+    return Math.max(0, Math.round((Date.now() - origin) / 1000));
+  });
 
   useEffect(() => {
-    if (!startTime) return;
-    if (firstResourceTime) {
+    if (firstResourceTime && startTime) {
       setElapsedSeconds(Math.max(1, Math.round((firstResourceTime - startTime) / 1000)));
       return;
     }
 
+    const origin = startTime || Date.now();
+    // Update immediately
+    setElapsedSeconds(Math.max(0, Math.round((Date.now() - origin) / 1000)));
+
     const interval = setInterval(() => {
-      setElapsedSeconds(Math.max(1, Math.round((Date.now() - startTime) / 1000)));
+      setElapsedSeconds(Math.max(0, Math.round((Date.now() - origin) / 1000)));
     }, 1000);
 
     return () => clearInterval(interval);
@@ -43,45 +52,60 @@ export default function TtfrTracker({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 8,
-        padding: '4px 10px',
+        padding: '5px 12px',
         borderRadius: 99,
-        background: isCompleted ? '#F0FDF4' : '#F4F4F5',
-        border: `1px solid ${isCompleted ? '#86EFAC' : '#E4E4E7'}`,
+        background: isCompleted ? '#F0FDF4' : '#F8FAFC',
+        border: `1.5px solid ${isCompleted ? '#86EFAC' : '#E2E8F0'}`,
+        boxShadow: isCompleted ? '0 1px 3px rgba(22, 101, 52, 0.1)' : '0 1px 2px rgba(0, 0, 0, 0.05)',
         cursor: 'pointer',
         userSelect: 'none',
-        transition: 'all 0.15s ease',
-        fontFamily: 'Inter, sans-serif'
+        transition: 'all 0.2s ease',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
       }}
-      title="Time-to-First-Resource (TTFR) Live Metric. Click for usability benchmarks."
+      title="Time-to-First-Resource (TTFR) Live Stopwatch. Click to open usability benchmarks."
     >
-      <span style={{ fontSize: 13 }}>{isCompleted ? '🏆' : '⏱'}</span>
+      {!isCompleted ? (
+        <span style={{
+          display: 'inline-block',
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          backgroundColor: '#3B82F6',
+          boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.25)',
+          animation: 'pulse 1.5s infinite'
+        }} />
+      ) : (
+        <span style={{ fontSize: 13 }}>🏆</span>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{
           fontSize: 11,
           fontWeight: 700,
-          color: isCompleted ? '#166534' : 'var(--k-text2)',
+          color: isCompleted ? '#166534' : '#64748B',
           letterSpacing: '0.02em'
         }}>
-          {isCompleted ? 'TTFR Achieved:' : 'TTFR Benchmark:'}
+          {isCompleted ? 'TTFR Achieved:' : 'TTFR Clock:'}
         </span>
         <span style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: isCompleted ? '#15803D' : 'var(--k-text)',
-          fontVariantNumeric: 'tabular-nums'
+          fontSize: 13,
+          fontWeight: 800,
+          color: isCompleted ? '#15803D' : '#0F172A',
+          fontVariantNumeric: 'tabular-nums',
+          minWidth: 32
         }}>
           {formatTime(elapsedSeconds)}
         </span>
         <span style={{
           fontSize: 10,
-          fontWeight: 600,
-          padding: '1px 6px',
-          borderRadius: 4,
-          background: isCompleted ? '#DCFCE7' : '#E4E4E7',
-          color: isCompleted ? '#166534' : '#52525B'
+          fontWeight: 700,
+          padding: '2px 7px',
+          borderRadius: 6,
+          background: isCompleted ? '#DCFCE7' : '#E2E8F0',
+          color: isCompleted ? '#166534' : '#475569'
         }}>
           {isCompleted
-            ? `${Math.round(((targetSeconds - elapsedSeconds) / targetSeconds) * 100)}% under target`
+            ? `${Math.max(0, Math.round(((targetSeconds - elapsedSeconds) / targetSeconds) * 100))}% under target`
             : 'Target: < 2m'}
         </span>
       </div>

@@ -67,11 +67,11 @@ export default function App() {
   const [usabilityOpen, setUsabilityOpen] = useState(false);
 
   // Time-to-First-Resource (TTFR) measurement & Dynamic Telemetry
-  const [startTime] = useState(() => Date.now());
+  const [startTime, setStartTime] = useState(() => Date.now());
   const [firstResourceTime, setFirstResourceTime] = useState(null);
 
   // Dynamic Session Telemetry (Time, Step dwell times, interaction counts, error rates)
-  const [telemetry, setTelemetry] = useState({
+  const [telemetry, setTelemetry] = useState(() => ({
     sessionStart: Date.now(),
     stepTimes: {
       welcome: 0,
@@ -86,7 +86,7 @@ export default function App() {
     interactionCount: 0,
     errorsCount: 0,
     actualTtfrSec: null,
-  });
+  }));
 
   // Dynamic user interaction tracker (clicks, keystrokes, sliders, buttons)
   const recordInteraction = useCallback(() => {
@@ -122,16 +122,22 @@ export default function App() {
     return () => clearInterval(timer);
   }, [state.stepIndex, showSplash]);
 
-  // Detect when first resource becomes ready
+  // Detect when first resource becomes ready in THIS onboarding session
   useEffect(() => {
-    if (!firstResourceTime && Array.isArray(state.downloads)) {
-      const anyDone = state.downloads.some(d => d.status === 'completed');
-      if (anyDone) {
+    if (!firstResourceTime && Array.isArray(state.downloads) && state.downloads.length > 0) {
+      const newlyDone = state.downloads.find(d => {
+        if (d.status !== 'completed') return false;
+        const started = d.startedAt || d.sessionStartedAt;
+        return started && started >= startTime;
+      });
+
+      if (newlyDone) {
         const now = Date.now();
         setFirstResourceTime(now);
+        const elapsed = Math.max(1, Math.round((now - startTime) / 1000));
         setTelemetry(prev => ({
           ...prev,
-          actualTtfrSec: Math.max(1, Math.round((now - startTime) / 1000)),
+          actualTtfrSec: elapsed,
         }));
       }
     }
@@ -198,7 +204,28 @@ export default function App() {
 
   const goNext  = () => setState(p => ({ ...p, stepIndex: Math.min(p.stepIndex + 1, STEPS.length - 1) }));
   const goBack  = () => setState(p => ({ ...p, stepIndex: Math.max(p.stepIndex - 1, 0) }));
-  const onReset = () => setState({ ...INITIAL_STATE });
+  const onReset = () => {
+    const now = Date.now();
+    setState({ ...INITIAL_STATE });
+    setFirstResourceTime(null);
+    setStartTime(now);
+    setTelemetry({
+      sessionStart: now,
+      stepTimes: {
+        welcome: 0,
+        interests: 0,
+        language: 0,
+        storage: 0,
+        recommendations: 0,
+        download: 0,
+        complete: 0,
+      },
+      visitedSteps: ['welcome'],
+      interactionCount: 0,
+      errorsCount: 0,
+      actualTtfrSec: null,
+    });
+  };
 
   const saveSession = useCallback(async (overrides = {}) => {
     try {

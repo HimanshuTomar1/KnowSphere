@@ -147,6 +147,8 @@ export default function DownloadStep({
             downloadedFormatted: '0 B',
             totalFormatted: z.sizeFormatted,
             sourceUrl: z.downloadUrl || null,
+            startedAt: Date.now(),
+            sessionStartedAt: Date.now()
           }))
         )
       );
